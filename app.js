@@ -130,10 +130,13 @@ function renderTrades() {
   body.innerHTML = "";
 
   let totalRisk = 0;
+  let totalDeployed = 0;
 
   trades.forEach(t => {
     const risk = Math.abs(t.entry - t.sl) * t.qty;
+    const invested = t.entry * t.qty;
     totalRisk += risk;
+    totalDeployed += invested;
     
     const slPercent = t.slPercent || ((Math.abs(t.entry - t.sl) / t.entry) * 100);
 
@@ -145,6 +148,7 @@ function renderTrades() {
         <td>₹${t.sl.toFixed(2)}</td>
         <td>${slPercent.toFixed(2)}%</td>
         <td><strong>${t.qty}</strong></td>
+        <td>₹${invested.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
         <td>₹${risk.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
         <td><button class="exit-btn" onclick="exitTrade('${t.id}')">Exit</button></td>
       </tr>`;
@@ -154,6 +158,9 @@ function renderTrades() {
   document.getElementById("portfolioRisk").innerText =
     `₹${totalRisk.toLocaleString('en-IN', {maximumFractionDigits: 0})} (${portfolioRiskPct.toFixed(2)}%)`;
 
+  document.getElementById("deployedCapital").innerText =
+    `₹${totalDeployed.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+
   if (portfolioRiskPct > 5) notifyRisk();
 }
 
@@ -162,13 +169,14 @@ function renderClosedTrades() {
   body.innerHTML = "";
 
   if (closedTrades.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #64748b;">No closed positions yet</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #64748b;">No closed positions yet</td></tr>';
     return;
   }
 
   closedTrades.forEach(t => {
     const pnl = (t.exit - t.entry) * t.qty;
     const pnlPercent = ((t.exit - t.entry) / t.entry) * 100;
+    const invested = t.entry * t.qty;
     const pnlClass = pnl >= 0 ? 'profit' : 'loss';
 
     body.innerHTML += `
@@ -177,6 +185,7 @@ function renderClosedTrades() {
         <td>₹${t.entry.toFixed(2)}</td>
         <td>₹${t.exit.toFixed(2)}</td>
         <td>${t.qty}</td>
+        <td>₹${invested.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
         <td class="${pnlClass}-text">₹${pnl.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
         <td class="${pnlClass}-text">${pnlPercent.toFixed(2)}%</td>
       </tr>`;
@@ -263,6 +272,228 @@ function loadClosedTrades() {
         closedTrades.push({ id: doc.id, ...doc.data() });
       });
       renderClosedTrades();
+      calculateMetrics();
+      renderGrowthChart();
+    })
+    .catch(err => {
+      console.error('Error loading closed trades:', err);
+    });
+}
+
+function calculateMetrics() {
+  if (closedTrades.length === 0) {
+    document.getElementById('totalTrades').innerText = '0';
+    document.getElementById('winRate').innerText = '0%';
+    document.getElementById('lossRate').innerText = '0%';
+    document.getElementById('totalPnL').innerText = '₹0';
+    document.getElementById('avgProfit').innerText = '₹0';
+    document.getElementById('avgLoss').innerText = '₹0';
+    document.getElementById('maxProfit').innerText = '₹0';
+    document.getElementById('maxLoss').innerText = '₹0';
+    document.getElementById('winLossRatio').innerText = '0';
+    document.getElementById('profitFactor').innerText = '0';
+    return;
+  }
+
+  const total = closedTrades.length;
+  const wins = closedTrades.filter(t => t.pnl > 0);
+  const losses = closedTrades.filter(t => t.pnl < 0);
+  
+  const totalWins = wins.length;
+  const totalLosses = losses.length;
+  const winRate = (totalWins / total) * 100;
+  const lossRate = (totalLosses / total) * 100;
+
+  const totalPnL = closedTrades.reduce((sum, t) => sum + t.pnl, 0);
+  
+  const avgProfit = totalWins > 0 ? wins.reduce((sum, t) => sum + t.pnl, 0) / totalWins : 0;
+  const avgLoss = totalLosses > 0 ? losses.reduce((sum, t) => sum + t.pnl, 0) / totalLosses : 0;
+  
+  const maxProfit = wins.length > 0 ? Math.max(...wins.map(t => t.pnl)) : 0;
+  const maxLoss = losses.length > 0 ? Math.min(...losses.map(t => t.pnl)) : 0;
+  
+  const winLossRatio = totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : totalWins;
+  
+  const totalGross = wins.reduce((sum, t) => sum + t.pnl, 0);
+  const totalLossAmount = Math.abs(losses.reduce((sum, t) => sum + t.pnl, 0));
+  const profitFactor = totalLossAmount > 0 ? (totalGross / totalLossAmount).toFixed(2) : totalGross > 0 ? '∞' : '0';
+
+  // Update DOM
+  document.getElementById('totalTrades').innerText = total;
+  document.getElementById('winRate').innerText = `${winRate.toFixed(1)}%`;
+  document.getElementById('lossRate').innerText = `${lossRate.toFixed(1)}%`;
+  
+  const totalPnLElement = document.getElementById('totalPnL');
+  totalPnLElement.innerText = `₹${totalPnL.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+  totalPnLElement.className = 'metric-value ' + (totalPnL >= 0 ? 'profit-text' : 'loss-text');
+  
+  document.getElementById('avgProfit').innerText = `₹${avgProfit.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+  document.getElementById('avgLoss').innerText = `₹${avgLoss.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+  document.getElementById('maxProfit').innerText = `₹${maxProfit.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+  document.getElementById('maxLoss').innerText = `₹${maxLoss.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+  document.getElementById('winLossRatio').innerText = winLossRatio;
+  document.getElementById('profitFactor').innerText = profitFactor;
+}
+
+let growthChart = null;
+
+function renderGrowthChart() {
+  if (closedTrades.length === 0) {
+    const ctx = document.getElementById('growthChart').getContext('2d');
+    if (growthChart) growthChart.destroy();
+    
+    growthChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['Start'],
+        datasets: [{
+          label: 'Account Balance',
+          data: [capital],
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => `Balance: ₹${context.parsed.y.toLocaleString('en-IN')}`
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            ticks: {
+              color: '#94a3b8',
+              callback: (value) => `₹${(value/1000).toFixed(0)}K`
+            },
+            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+          },
+          x: {
+            ticks: { color: '#94a3b8' },
+            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+          }
+        }
+      }
+    });
+    return;
+  }
+
+  // Sort by exit date
+  const sortedTrades = [...closedTrades].sort((a, b) => {
+    const dateA = a.exitDate?.toDate ? a.exitDate.toDate() : new Date(a.exitDate);
+    const dateB = b.exitDate?.toDate ? b.exitDate.toDate() : new Date(b.exitDate);
+    return dateA - dateB;
+  });
+
+  // Calculate cumulative balance
+  let balance = capital;
+  const labels = ['Start'];
+  const balances = [capital];
+
+  sortedTrades.forEach((trade, index) => {
+    balance += trade.pnl;
+    labels.push(`Trade ${index + 1}`);
+    balances.push(balance);
+  });
+
+  const ctx = document.getElementById('growthChart').getContext('2d');
+  
+  if (growthChart) growthChart.destroy();
+
+  growthChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Account Balance',
+        data: balances,
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+        borderWidth: 3,
+        tension: 0.4,
+        fill: true,
+        pointBackgroundColor: balances.map((val, idx) => {
+          if (idx === 0) return '#22c55e';
+          const pnl = sortedTrades[idx - 1]?.pnl || 0;
+          return pnl >= 0 ? '#22c55e' : '#ef4444';
+        }),
+        pointBorderColor: '#0f172a',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 7
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(15, 23, 42, 0.9)',
+          titleColor: '#22c55e',
+          bodyColor: '#e5e7eb',
+          borderColor: '#22c55e',
+          borderWidth: 1,
+          padding: 12,
+          displayColors: false,
+          callbacks: {
+            title: (context) => context[0].label,
+            label: (context) => {
+              const balance = context.parsed.y;
+              const profit = balance - capital;
+              const profitPct = ((profit / capital) * 100).toFixed(2);
+              return [
+                `Balance: ₹${balance.toLocaleString('en-IN', {maximumFractionDigits: 0})}`,
+                `Profit: ₹${profit.toLocaleString('en-IN', {maximumFractionDigits: 0})} (${profitPct}%)`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: false,
+          ticks: {
+            color: '#94a3b8',
+            font: { size: 11 },
+            callback: (value) => `₹${(value/1000).toFixed(0)}K`
+          },
+          grid: { color: 'rgba(255, 255, 255, 0.05)' }
+        },
+        x: {
+          ticks: { 
+            color: '#94a3b8',
+            font: { size: 10 },
+            maxRotation: 45,
+            minRotation: 0
+          },
+          grid: { color: 'rgba(255, 255, 255, 0.05)' }
+        }
+      }
+    }
+  });
+}
+
+function loadClosedTrades() {
+  db.collection(CLOSED_TRADES_COLLECTION)
+    .orderBy("exitDate", "desc")
+    .get()
+    .then(snapshot => {
+      closedTrades = [];
+      snapshot.forEach(doc => {
+        closedTrades.push({ id: doc.id, ...doc.data() });
+      });
+      renderClosedTrades();
+      calculateMetrics();
+      renderGrowthChart();
     })
     .catch(err => {
       console.error('Error loading closed trades:', err);

@@ -13,25 +13,40 @@
   </header>
 
   <div class="top-controls">
-    <section id="settings">
-      <h2>⚙️ Settings</h2>
-      <div class="settings-grid">
-        <div class="setting-item">
-          <label for="capitalInput">Capital (₹)</label>
-          <input id="capitalInput" type="number" value="1000000" oninput="updateCapital()" />
+    <div class="left-column">
+      <section id="settings">
+        <h2>⚙️ Settings</h2>
+        <div class="settings-grid">
+          <div class="setting-item">
+            <label for="capitalInput">Capital (₹)</label>
+            <input id="capitalInput" type="number" value="1000000" oninput="updateCapital()" />
+          </div>
+          <div class="setting-item">
+            <label for="riskPerTradeInput">Risk/Trade (%)</label>
+            <input id="riskPerTradeInput" type="number" value="2" step="0.1" oninput="updateRiskPerTrade()" />
+          </div>
         </div>
-        <div class="setting-item">
-          <label for="riskPerTradeInput">Risk/Trade (%)</label>
-          <input id="riskPerTradeInput" type="number" value="2" step="0.1" oninput="updateRiskPerTrade()" />
+        <div class="settings-info">
+          <div class="info-box">
+            <span class="info-label">Max Risk:</span>
+            <span id="maxRiskAmount" class="info-value">₹20,000</span>
+          </div>
         </div>
-      </div>
-      <div class="settings-info">
-        <div class="info-box">
-          <span class="info-label">Max Risk:</span>
-          <span id="maxRiskAmount" class="info-value">₹20,000</span>
+      </section>
+
+      <section id="dashboard">
+        <div class="risk-grid">
+          <div class="risk-item">
+            <h3>Portfolio Risk</h3>
+            <div id="portfolioRisk" class="risk-value">₹0 (0%)</div>
+          </div>
+          <div class="risk-item">
+            <h3>Deployed</h3>
+            <div id="deployedCapital" class="risk-value">₹0</div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
     <section id="addTrade">
       <h2>📈 Add Trade</h2>
@@ -60,18 +75,13 @@
     </section>
   </div>
 
-  <section id="dashboard">
-    <h2>Portfolio Risk</h2>
-    <div id="portfolioRisk">₹0 (0%)</div>
-  </section>
-
   <section id="positions">
     <h2>Open Positions</h2>
     <table>
       <thead>
         <tr>
           <th>Stock</th><th>Entry</th><th>LTP</th>
-          <th>SL</th><th>SL%</th><th>Qty</th><th>Risk (₹)</th><th>Action</th>
+          <th>SL</th><th>SL%</th><th>Qty</th><th>Invested</th><th>Risk (₹)</th><th>Action</th>
         </tr>
       </thead>
       <tbody id="positionsBody"></tbody>
@@ -84,13 +94,66 @@
       <thead>
         <tr>
           <th>Stock</th><th>Entry</th><th>Exit</th>
-          <th>Qty</th><th>P&L (₹)</th><th>P&L %</th>
+          <th>Qty</th><th>Invested</th><th>P&L (₹)</th><th>P&L %</th>
         </tr>
       </thead>
       <tbody id="closedPositionsBody"></tbody>
     </table>
   </section>
 
+  <section id="tradingMetrics">
+    <h2>📊 Trading Performance</h2>
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <span class="metric-label">Total Trades</span>
+        <span id="totalTrades" class="metric-value">0</span>
+      </div>
+      <div class="metric-card profit-card">
+        <span class="metric-label">Win Rate</span>
+        <span id="winRate" class="metric-value">0%</span>
+      </div>
+      <div class="metric-card loss-card">
+        <span class="metric-label">Loss Rate</span>
+        <span id="lossRate" class="metric-value">0%</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Total P&L</span>
+        <span id="totalPnL" class="metric-value">₹0</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Avg Profit</span>
+        <span id="avgProfit" class="metric-value">₹0</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Avg Loss</span>
+        <span id="avgLoss" class="metric-value">₹0</span>
+      </div>
+      <div class="metric-card profit-card">
+        <span class="metric-label">Max Profit</span>
+        <span id="maxProfit" class="metric-value">₹0</span>
+      </div>
+      <div class="metric-card loss-card">
+        <span class="metric-label">Max Loss</span>
+        <span id="maxLoss" class="metric-value">₹0</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Win/Loss Ratio</span>
+        <span id="winLossRatio" class="metric-value">0</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Profit Factor</span>
+        <span id="profitFactor" class="metric-value">0</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="accountGrowth">
+    <h2>📈 Account Growth</h2>
+    <canvas id="growthChart"></canvas>
+  </section>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>

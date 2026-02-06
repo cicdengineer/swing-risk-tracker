@@ -42,6 +42,16 @@ header h1 {
   margin-bottom: 12px;
 }
 
+.left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.left-column section {
+  margin-bottom: 0;
+}
+
 section {
   background: rgba(30, 41, 59, 0.5);
   backdrop-filter: blur(10px);
@@ -70,7 +80,7 @@ section h2 {
 }
 
 #portfolioRisk {
-  font-size: 1.3rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #22c55e;
   padding: 10px;
@@ -78,6 +88,54 @@ section h2 {
   border-radius: 10px;
   border-left: 4px solid #22c55e;
   text-align: center;
+}
+
+#dashboard {
+  padding: 10px;
+}
+
+#dashboard h2 {
+  font-size: 0.8rem;
+  margin-bottom: 8px;
+}
+
+/* Risk Grid Layout */
+.risk-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.risk-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.risk-item h3 {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.risk-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #22c55e;
+  padding: 8px;
+  background: rgba(34, 197, 94, 0.1);
+  border-radius: 8px;
+  border-left: 3px solid #22c55e;
+  text-align: center;
+}
+
+#deployedCapital {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+  border-left-color: #3b82f6;
 }
 
 table {
@@ -234,6 +292,64 @@ button:active {
   font-weight: 700;
 }
 
+/* Metrics Grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.metric-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34, 197, 94, 0.3);
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.2);
+}
+
+.metric-card.profit-card {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.metric-card.loss-card {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.metric-label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.metric-value {
+  font-size: 1.3rem;
+  color: #e5e7eb;
+  font-weight: 700;
+}
+
+/* Chart Section */
+#accountGrowth {
+  min-height: 300px;
+}
+
+#growthChart {
+  height: 280px !important;
+  max-height: 300px;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
@@ -374,6 +490,10 @@ button:active {
     grid-template-columns: 1fr;
     gap: 10px;
   }
+
+  .left-column {
+    gap: 10px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -398,6 +518,20 @@ button:active {
   section h2 {
     font-size: 0.85rem;
     margin-bottom: 8px;
+  }
+
+  .risk-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .risk-value {
+    font-size: 0.9rem;
+    padding: 6px;
+  }
+
+  .risk-item h3 {
+    font-size: 0.7rem;
   }
   
   #portfolioRisk {
@@ -457,6 +591,24 @@ button:active {
     padding: 8px 10px;
     font-size: 0.85rem;
   }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .metric-value {
+    font-size: 1.1rem;
+  }
+
+  #growthChart {
+    height: 220px !important;
+  }
+
+  .exit-btn {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -476,5 +628,18 @@ button:active {
 
   .top-controls {
     gap: 8px;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .metric-card {
+    padding: 10px;
+  }
+
+  .metric-value {
+    font-size: 1rem;
   }
 }
