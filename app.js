@@ -58,7 +58,6 @@ function calculatePreview() {
   const sl = parseFloat(document.getElementById("sl").value);
   
   if (!entry || !sl || entry <= 0 || sl <= 0) {
-    document.getElementById('slDistance').innerText = '-';
     document.getElementById('slPercent').innerText = '-';
     document.getElementById('qtyPreview').innerText = '-';
     document.getElementById('riskPreview').innerText = '-';
@@ -71,7 +70,6 @@ function calculatePreview() {
   const qty = Math.floor(riskAmount / slDistance);
   const totalRisk = slDistance * qty;
   
-  document.getElementById('slDistance').innerText = `₹${slDistance.toFixed(2)}`;
   document.getElementById('slPercent').innerText = `${slPercent.toFixed(2)}%`;
   document.getElementById('qtyPreview').innerText = qty;
   document.getElementById('riskPreview').innerText = `₹${totalRisk.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
@@ -81,7 +79,6 @@ function addTrade() {
   const entry = parseFloat(document.getElementById("entry").value);
   const sl = parseFloat(document.getElementById("sl").value);
   const symbol = document.getElementById("symbol").value.trim().toUpperCase();
-  const notes = document.getElementById("notes").value;
 
   if (!symbol || !entry || !sl) {
     alert('Please fill in Stock Symbol, Entry Price, and Stop Loss');
@@ -109,7 +106,6 @@ function addTrade() {
     sl,
     slPercent,
     qty,
-    notes,
     ltp: entry,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -119,7 +115,6 @@ function addTrade() {
     document.getElementById("symbol").value = '';
     document.getElementById("entry").value = '';
     document.getElementById("sl").value = '';
-    document.getElementById("notes").value = '';
     calculatePreview();
     loadTrades();
   }).catch(err => {
