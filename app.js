@@ -1,4 +1,19 @@
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDWvLCgOPc4Ae6Ei1iK2KscIKqMxYAX_3I",
+  authDomain: "swing-risk-tracker.firebaseapp.com",
+  projectId: "swing-risk-tracker",
+  storageBucket: "swing-risk-tracker.firebasestorage.app",
+  messagingSenderId: "256506757099",
+  appId: "1:256506757099:web:4074e24612b98ee7e123ae"
+};
+
+// Initialize Firebase (using compat mode)
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 let trades = [];
+const TRADES_COLLECTION = "trades";
 let capital = 10000000;
 
 function addTrade() {
@@ -12,14 +27,20 @@ function addTrade() {
   const qty = Math.floor(riskAmount / Math.abs(entry - sl));
 
   const trade = {
-    symbol, entry, sl, qty, notes,
-    rMultiple: 0,
-    ltp: entry
+    symbol,
+    entry,
+    sl,
+    qty,
+    notes,
+    ltp: entry,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
-  trades.push(trade);
-  renderTrades();
+  db.collection(TRADES_COLLECTION).add(trade).then(() => {
+    loadTrades();
+  });
 }
+
 
 function renderTrades() {
   const body = document.getElementById("positionsBody");
@@ -47,3 +68,23 @@ function renderTrades() {
 
   if (totalRisk > capital * 0.05) notifyRisk();
 }
+
+function loadTrades() {
+  db.collection(TRADES_COLLECTION)
+    .orderBy("createdAt", "asc")
+    .get()
+    .then(snapshot => {
+      trades = [];
+      snapshot.forEach(doc => {
+        trades.push({ id: doc.id, ...doc.data() });
+      });
+      renderTrades();
+    });
+}
+
+function notifyRisk() {
+  alert("⚠️ Portfolio risk exceeds 5%!");
+}
+
+loadTrades();
+
