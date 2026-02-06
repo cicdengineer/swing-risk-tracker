@@ -8,9 +8,57 @@
 <body class="dark">
 
   <header>
-    <h1>📊 Swing Risk Tracker</h1>
+    <h1>Swing Risk Tracker</h1>
     <button id="themeToggle">🌙</button>
   </header>
+
+  <div class="top-controls">
+    <section id="settings">
+      <h2>⚙️ Settings</h2>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label for="capitalInput">Capital (₹)</label>
+          <input id="capitalInput" type="number" value="1000000" oninput="updateCapital()" />
+        </div>
+        <div class="setting-item">
+          <label for="riskPerTradeInput">Risk/Trade (%)</label>
+          <input id="riskPerTradeInput" type="number" value="2" step="0.1" oninput="updateRiskPerTrade()" />
+        </div>
+      </div>
+      <div class="settings-info">
+        <div class="info-box">
+          <span class="info-label">Max Risk:</span>
+          <span id="maxRiskAmount" class="info-value">₹20,000</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="addTrade">
+      <h2>📈 Add Trade</h2>
+      <div class="trade-form">
+        <input id="symbol" placeholder="Stock Symbol" />
+        <div class="price-inputs">
+          <input id="entry" type="number" placeholder="Entry" step="0.01" oninput="calculatePreview()" />
+          <input id="sl" type="number" placeholder="Stop Loss" step="0.01" oninput="calculatePreview()" />
+        </div>
+        <div id="tradePreview" class="trade-preview">
+          <div class="preview-item">
+            <span class="preview-label">SL %</span>
+            <span id="slPercent" class="preview-value">-</span>
+          </div>
+          <div class="preview-item highlight">
+            <span class="preview-label">Qty</span>
+            <span id="qtyPreview" class="preview-value">-</span>
+          </div>
+          <div class="preview-item">
+            <span class="preview-label">Risk</span>
+            <span id="riskPreview" class="preview-value">-</span>
+          </div>
+        </div>
+        <button onclick="addTrade()">Add Trade</button>
+      </div>
+    </section>
+  </div>
 
   <section id="dashboard">
     <h2>Portfolio Risk</h2>
@@ -23,21 +71,11 @@
       <thead>
         <tr>
           <th>Stock</th><th>Entry</th><th>LTP</th>
-          <th>SL</th><th>Qty</th><th>R</th>
+          <th>SL</th><th>SL%</th><th>Qty</th><th>Risk (₹)</th>
         </tr>
       </thead>
       <tbody id="positionsBody"></tbody>
     </table>
-  </section>
-
-  <section id="addTrade">
-    <h2>Add Trade</h2>
-    <input id="symbol" placeholder="RELIANCE" />
-    <input id="entry" placeholder="Entry" />
-    <input id="sl" placeholder="Stop Loss" />
-    <input id="riskPercent" placeholder="Risk %" />
-    <textarea id="notes" placeholder="Trade Notes"></textarea>
-    <button onclick="addTrade()">Add</button>
   </section>
 
 <!-- Firebase SDKs -->

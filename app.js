@@ -14,22 +14,100 @@ const db = firebase.firestore();
 
 let trades = [];
 const TRADES_COLLECTION = "trades";
-let capital = 10000000;
+const SETTINGS_DOC = "settings/userSettings";
+
+// Default settings
+let capital = 1000000;
+let riskPerTrade = 2;
+
+// Load settings from localStorage or use defaults
+function loadSettings() {
+  const savedCapital = localStorage.getItem('capital');
+  const savedRiskPerTrade = localStorage.getItem('riskPerTrade');
+  
+  if (savedCapital) capital = parseFloat(savedCapital);
+  if (savedRiskPerTrade) riskPerTrade = parseFloat(savedRiskPerTrade);
+  
+  document.getElementById('capitalInput').value = capital;
+  document.getElementById('riskPerTradeInput').value = riskPerTrade;
+  updateMaxRiskDisplay();
+}
+
+function updateCapital() {
+  capital = parseFloat(document.getElementById('capitalInput').value) || 0;
+  localStorage.setItem('capital', capital);
+  updateMaxRiskDisplay();
+  calculatePreview();
+  renderTrades();
+}
+
+function updateRiskPerTrade() {
+  riskPerTrade = parseFloat(document.getElementById('riskPerTradeInput').value) || 0;
+  localStorage.setItem('riskPerTrade', riskPerTrade);
+  updateMaxRiskDisplay();
+  calculatePreview();
+}
+
+function updateMaxRiskDisplay() {
+  const maxRisk = capital * (riskPerTrade / 100);
+  document.getElementById('maxRiskAmount').innerText = `₹${maxRisk.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+}
+
+function calculatePreview() {
+  const entry = parseFloat(document.getElementById("entry").value);
+  const sl = parseFloat(document.getElementById("sl").value);
+  
+  if (!entry || !sl || entry <= 0 || sl <= 0) {
+    document.getElementById('slDistance').innerText = '-';
+    document.getElementById('slPercent').innerText = '-';
+    document.getElementById('qtyPreview').innerText = '-';
+    document.getElementById('riskPreview').innerText = '-';
+    return;
+  }
+  
+  const slDistance = Math.abs(entry - sl);
+  const slPercent = (slDistance / entry) * 100;
+  const riskAmount = capital * (riskPerTrade / 100);
+  const qty = Math.floor(riskAmount / slDistance);
+  const totalRisk = slDistance * qty;
+  
+  document.getElementById('slDistance').innerText = `₹${slDistance.toFixed(2)}`;
+  document.getElementById('slPercent').innerText = `${slPercent.toFixed(2)}%`;
+  document.getElementById('qtyPreview').innerText = qty;
+  document.getElementById('riskPreview').innerText = `₹${totalRisk.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+}
 
 function addTrade() {
-  const entry = +document.getElementById("entry").value;
-  const sl = +document.getElementById("sl").value;
-  const riskPct = +document.getElementById("riskPercent").value;
-  const symbol = document.getElementById("symbol").value;
+  const entry = parseFloat(document.getElementById("entry").value);
+  const sl = parseFloat(document.getElementById("sl").value);
+  const symbol = document.getElementById("symbol").value.trim().toUpperCase();
   const notes = document.getElementById("notes").value;
 
-  const riskAmount = capital * (riskPct / 100);
-  const qty = Math.floor(riskAmount / Math.abs(entry - sl));
+  if (!symbol || !entry || !sl) {
+    alert('Please fill in Stock Symbol, Entry Price, and Stop Loss');
+    return;
+  }
+
+  if (entry <= 0 || sl <= 0) {
+    alert('Entry and Stop Loss must be positive numbers');
+    return;
+  }
+
+  const slDistance = Math.abs(entry - sl);
+  const slPercent = (slDistance / entry) * 100;
+  const riskAmount = capital * (riskPerTrade / 100);
+  const qty = Math.floor(riskAmount / slDistance);
+
+  if (qty <= 0) {
+    alert('Calculated quantity is 0. Adjust your risk parameters or entry/SL values.');
+    return;
+  }
 
   const trade = {
     symbol,
     entry,
     sl,
+    slPercent,
     qty,
     notes,
     ltp: entry,
@@ -37,7 +115,15 @@ function addTrade() {
   };
 
   db.collection(TRADES_COLLECTION).add(trade).then(() => {
+    // Clear form
+    document.getElementById("symbol").value = '';
+    document.getElementById("entry").value = '';
+    document.getElementById("sl").value = '';
+    document.getElementById("notes").value = '';
+    calculatePreview();
     loadTrades();
+  }).catch(err => {
+    alert('Error adding trade: ' + err.message);
   });
 }
 
@@ -49,24 +135,28 @@ function renderTrades() {
   let totalRisk = 0;
 
   trades.forEach(t => {
-    const risk = (t.entry - t.sl) * t.qty;
+    const risk = Math.abs(t.entry - t.sl) * t.qty;
     totalRisk += risk;
+    
+    const slPercent = t.slPercent || ((Math.abs(t.entry - t.sl) / t.entry) * 100);
 
     body.innerHTML += `
       <tr>
-        <td>${t.symbol}</td>
-        <td>${t.entry}</td>
-        <td>${t.ltp}</td>
-        <td>${t.sl}</td>
-        <td>${t.qty}</td>
-        <td>${(risk / (capital * 0.01)).toFixed(2)}R</td>
+        <td><strong>${t.symbol}</strong></td>
+        <td>₹${t.entry.toFixed(2)}</td>
+        <td>₹${t.ltp.toFixed(2)}</td>
+        <td>₹${t.sl.toFixed(2)}</td>
+        <td>${slPercent.toFixed(2)}%</td>
+        <td><strong>${t.qty}</strong></td>
+        <td>₹${risk.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
       </tr>`;
   });
 
+  const portfolioRiskPct = (totalRisk / capital) * 100;
   document.getElementById("portfolioRisk").innerText =
-    `₹${totalRisk.toFixed(0)} (${((totalRisk/capital)*100).toFixed(2)}%)`;
+    `₹${totalRisk.toLocaleString('en-IN', {maximumFractionDigits: 0})} (${portfolioRiskPct.toFixed(2)}%)`;
 
-  if (totalRisk > capital * 0.05) notifyRisk();
+  if (portfolioRiskPct > 5) notifyRisk();
 }
 
 function loadTrades() {
@@ -79,6 +169,9 @@ function loadTrades() {
         trades.push({ id: doc.id, ...doc.data() });
       });
       renderTrades();
+    })
+    .catch(err => {
+      console.error('Error loading trades:', err);
     });
 }
 
@@ -86,5 +179,7 @@ function notifyRisk() {
   alert("⚠️ Portfolio risk exceeds 5%!");
 }
 
+// Initialize app
+loadSettings();
 loadTrades();
 
