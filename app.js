@@ -13,7 +13,9 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 let trades = [];
+let closedTrades = [];
 const TRADES_COLLECTION = "trades";
+const CLOSED_TRADES_COLLECTION = "closedTrades";
 const SETTINGS_DOC = "settings/userSettings";
 
 // Default settings
@@ -144,6 +146,7 @@ function renderTrades() {
         <td>${slPercent.toFixed(2)}%</td>
         <td><strong>${t.qty}</strong></td>
         <td>₹${risk.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
+        <td><button class="exit-btn" onclick="exitTrade('${t.id}')">Exit</button></td>
       </tr>`;
   });
 
@@ -152,6 +155,86 @@ function renderTrades() {
     `₹${totalRisk.toLocaleString('en-IN', {maximumFractionDigits: 0})} (${portfolioRiskPct.toFixed(2)}%)`;
 
   if (portfolioRiskPct > 5) notifyRisk();
+}
+
+function renderClosedTrades() {
+  const body = document.getElementById("closedPositionsBody");
+  body.innerHTML = "";
+
+  if (closedTrades.length === 0) {
+    body.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #64748b;">No closed positions yet</td></tr>';
+    return;
+  }
+
+  closedTrades.forEach(t => {
+    const pnl = (t.exit - t.entry) * t.qty;
+    const pnlPercent = ((t.exit - t.entry) / t.entry) * 100;
+    const pnlClass = pnl >= 0 ? 'profit' : 'loss';
+
+    body.innerHTML += `
+      <tr class="${pnlClass}">
+        <td><strong>${t.symbol}</strong></td>
+        <td>₹${t.entry.toFixed(2)}</td>
+        <td>₹${t.exit.toFixed(2)}</td>
+        <td>${t.qty}</td>
+        <td class="${pnlClass}-text">₹${pnl.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
+        <td class="${pnlClass}-text">${pnlPercent.toFixed(2)}%</td>
+      </tr>`;
+  });
+}
+
+function exitTrade(tradeId) {
+  const trade = trades.find(t => t.id === tradeId);
+  if (!trade) {
+    alert('Trade not found');
+    return;
+  }
+
+  const exitPrice = prompt(`Exit ${trade.symbol}\nEntry: ₹${trade.entry}\nQuantity: ${trade.qty}\n\nEnter Exit Price:`);
+  
+  if (!exitPrice) return; // User cancelled
+  
+  const exit = parseFloat(exitPrice);
+  
+  if (isNaN(exit) || exit <= 0) {
+    alert('Please enter a valid exit price');
+    return;
+  }
+
+  const pnl = (exit - trade.entry) * trade.qty;
+  const pnlPercent = ((exit - trade.entry) / trade.entry) * 100;
+
+  // Confirm the exit
+  const confirmMsg = `Exit Confirmation:\n\nStock: ${trade.symbol}\nEntry: ₹${trade.entry}\nExit: ₹${exit}\nQuantity: ${trade.qty}\n\nP&L: ₹${pnl.toFixed(2)} (${pnlPercent.toFixed(2)}%)\n\nConfirm exit?`;
+  
+  if (!confirm(confirmMsg)) return;
+
+  // Create closed trade record
+  const closedTrade = {
+    symbol: trade.symbol,
+    entry: trade.entry,
+    exit: exit,
+    sl: trade.sl,
+    slPercent: trade.slPercent,
+    qty: trade.qty,
+    pnl: pnl,
+    pnlPercent: pnlPercent,
+    entryDate: trade.createdAt,
+    exitDate: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  // Add to closed trades collection and delete from open trades
+  db.collection(CLOSED_TRADES_COLLECTION).add(closedTrade)
+    .then(() => {
+      return db.collection(TRADES_COLLECTION).doc(tradeId).delete();
+    })
+    .then(() => {
+      loadTrades();
+      loadClosedTrades();
+    })
+    .catch(err => {
+      alert('Error exiting trade: ' + err.message);
+    });
 }
 
 function loadTrades() {
@@ -170,6 +253,22 @@ function loadTrades() {
     });
 }
 
+function loadClosedTrades() {
+  db.collection(CLOSED_TRADES_COLLECTION)
+    .orderBy("exitDate", "desc")
+    .get()
+    .then(snapshot => {
+      closedTrades = [];
+      snapshot.forEach(doc => {
+        closedTrades.push({ id: doc.id, ...doc.data() });
+      });
+      renderClosedTrades();
+    })
+    .catch(err => {
+      console.error('Error loading closed trades:', err);
+    });
+}
+
 function notifyRisk() {
   alert("⚠️ Portfolio risk exceeds 5%!");
 }
@@ -177,4 +276,5 @@ function notifyRisk() {
 // Initialize app
 loadSettings();
 loadTrades();
+loadClosedTrades();
 
