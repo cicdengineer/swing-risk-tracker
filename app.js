@@ -62,6 +62,7 @@ function calculatePreview() {
   if (!entry || !sl || entry <= 0 || sl <= 0) {
     document.getElementById('slPercent').innerText = '-';
     document.getElementById('qtyPreview').innerText = '-';
+    document.getElementById('investPreview').innerText = '-';
     document.getElementById('riskPreview').innerText = '-';
     return;
   }
@@ -71,9 +72,11 @@ function calculatePreview() {
   const riskAmount = capital * (riskPerTrade / 100);
   const qty = Math.floor(riskAmount / slDistance);
   const totalRisk = slDistance * qty;
+  const invested = entry * qty;
   
   document.getElementById('slPercent').innerText = `${slPercent.toFixed(2)}%`;
   document.getElementById('qtyPreview').innerText = qty;
+  document.getElementById('investPreview').innerText = `₹${invested.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
   document.getElementById('riskPreview').innerText = `₹${totalRisk.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
 }
 
