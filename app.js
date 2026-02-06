@@ -55,6 +55,26 @@ function updateMaxRiskDisplay() {
   document.getElementById('maxRiskAmount').innerText = `₹${maxRisk.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
 }
 
+// Helper function to format date
+function formatDate(timestamp) {
+  if (!timestamp) return '-';
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+// Helper function to calculate holding days
+function calculateHoldingDays(entryDate) {
+  if (!entryDate) return 0;
+  const entry = entryDate.toDate ? entryDate.toDate() : new Date(entryDate);
+  const today = new Date();
+  const diffTime = Math.abs(today - entry);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+}
+
 function calculatePreview() {
   const entry = parseFloat(document.getElementById("entry").value);
   const sl = parseFloat(document.getElementById("sl").value);
@@ -142,17 +162,21 @@ function renderTrades() {
     totalDeployed += invested;
     
     const slPercent = t.slPercent || ((Math.abs(t.entry - t.sl) / t.entry) * 100);
+    const entryDate = formatDate(t.createdAt);
+    const holdingDays = calculateHoldingDays(t.createdAt);
 
     body.innerHTML += `
       <tr>
         <td><strong>${t.symbol}</strong></td>
+        <td>${entryDate}</td>
+        <td>${holdingDays}</td>
         <td>₹${t.entry.toFixed(2)}</td>
         <td>₹${t.ltp.toFixed(2)}</td>
-        <td>₹${t.sl.toFixed(2)}</td>
-        <td>${slPercent.toFixed(2)}%</td>
+        <td><input type="number" class="sl-input" value="${t.sl.toFixed(2)}" step="0.01" onchange="updateSL('${t.id}', this.value)" /></td>
+        <td id="slPercent-${t.id}">${slPercent.toFixed(2)}%</td>
         <td><strong>${t.qty}</strong></td>
         <td>₹${invested.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
-        <td>₹${risk.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
+        <td id="risk-${t.id}">₹${risk.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
         <td><button class="exit-btn" onclick="exitTrade('${t.id}')">Exit</button></td>
       </tr>`;
   });
@@ -167,12 +191,51 @@ function renderTrades() {
   if (portfolioRiskPct > 5) notifyRisk();
 }
 
+function updateSL(tradeId, newSL) {
+  const sl = parseFloat(newSL);
+  
+  if (isNaN(sl) || sl <= 0) {
+    alert('Please enter a valid stop loss value');
+    loadTrades(); // Reload to reset the input
+    return;
+  }
+
+  const trade = trades.find(t => t.id === tradeId);
+  if (!trade) {
+    alert('Trade not found');
+    return;
+  }
+
+  // Calculate new values
+  const slDistance = Math.abs(trade.entry - sl);
+  const slPercent = (slDistance / trade.entry) * 100;
+  const risk = slDistance * trade.qty;
+
+  // Update in Firebase
+  db.collection(TRADES_COLLECTION).doc(tradeId).update({
+    sl: sl,
+    slPercent: slPercent
+  })
+  .then(() => {
+    // Update local display
+    document.getElementById(`slPercent-${tradeId}`).innerText = `${slPercent.toFixed(2)}%`;
+    document.getElementById(`risk-${tradeId}`).innerText = `₹${risk.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+    
+    // Reload to update portfolio risk
+    loadTrades();
+  })
+  .catch(err => {
+    alert('Error updating stop loss: ' + err.message);
+    loadTrades(); // Reload to reset
+  });
+}
+
 function renderClosedTrades() {
   const body = document.getElementById("closedPositionsBody");
   body.innerHTML = "";
 
   if (closedTrades.length === 0) {
-    body.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #64748b;">No closed positions yet</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #64748b;">No closed positions yet</td></tr>';
     return;
   }
 
@@ -181,10 +244,14 @@ function renderClosedTrades() {
     const pnlPercent = ((t.exit - t.entry) / t.entry) * 100;
     const invested = t.entry * t.qty;
     const pnlClass = pnl >= 0 ? 'profit' : 'loss';
+    const entryDate = formatDate(t.entryDate);
+    const exitDate = formatDate(t.exitDate);
 
     body.innerHTML += `
       <tr class="${pnlClass}">
         <td><strong>${t.symbol}</strong></td>
+        <td>${entryDate}</td>
+        <td>${exitDate}</td>
         <td>₹${t.entry.toFixed(2)}</td>
         <td>₹${t.exit.toFixed(2)}</td>
         <td>${t.qty}</td>

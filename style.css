@@ -82,11 +82,11 @@ section h2 {
 #portfolioRisk {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #22c55e;
+  color: #ef4444;
   padding: 10px;
-  background: rgba(34, 197, 94, 0.1);
+  background: rgba(239, 68, 68, 0.1);
   border-radius: 10px;
-  border-left: 4px solid #22c55e;
+  border-left: 4px solid #ef4444;
   text-align: center;
 }
 
@@ -155,7 +155,7 @@ th {
   padding: 10px 8px;
   text-align: left;
   font-weight: 600;
-  color: #0f172a;
+  color: #000000;
   text-transform: uppercase;
   font-size: 0.7rem;
   letter-spacing: 0.3px;
@@ -166,6 +166,42 @@ td {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   color: #cbd5e1;
   font-size: 0.85rem;
+}
+
+/* Date and Days columns - compact styling */
+table th:nth-child(2) {
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: #000000;
+}
+
+table td:nth-child(2) {
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: #cbd5e1;
+}
+
+table td:nth-child(3),
+table th:nth-child(3) {
+  text-align: center;
+  font-weight: 600;
+  color: #3b82f6;
+  font-size: 0.8rem;
+}
+
+/* Closed Positions - Exit Date column styling */
+#closedPositions table th:nth-child(3) {
+  font-size: 0.75rem;
+  color: #000000;
+  text-align: left;
+  font-weight: 600;
+}
+
+#closedPositions table td:nth-child(3) {
+  font-size: 0.75rem;
+  color: #cbd5e1;
+  text-align: left;
+  font-weight: normal;
 }
 
 tbody tr {
@@ -271,6 +307,33 @@ button:active {
 
 .exit-btn:hover {
   box-shadow: 0 3px 12px rgba(239, 68, 68, 0.4);
+}
+
+/* SL Input Field */
+.sl-input {
+  width: 100%;
+  max-width: 90px;
+  padding: 6px 8px;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  color: #e5e7eb;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.sl-input:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(30, 41, 59, 0.7);
+}
+
+.sl-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: rgba(30, 41, 59, 0.8);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 /* Profit/Loss Styling */
@@ -436,6 +499,10 @@ button:active {
   font-weight: 700;
 }
 
+.info-value.max-risk-red {
+  color: #ef4444;
+}
+
 /* Trade Form */
 .trade-form {
   display: flex;
@@ -552,6 +619,21 @@ button:active {
     padding: 8px 6px;
     font-size: 0.75rem;
   }
+
+  /* Date columns more compact on mobile */
+  table td:nth-child(2),
+  table th:nth-child(2),
+  table td:nth-child(3),
+  table th:nth-child(3) {
+    padding: 8px 4px;
+    font-size: 0.65rem;
+  }
+
+  .sl-input {
+    max-width: 70px;
+    font-size: 0.75rem;
+    padding: 4px 6px;
+  }
   
   .settings-grid {
     grid-template-columns: 1fr;
@@ -628,6 +710,34 @@ button:active {
 
   .top-controls {
     gap: 8px;
+  }
+
+  table {
+    font-size: 0.7rem;
+  }
+
+  th, td {
+    padding: 6px 3px;
+    font-size: 0.65rem;
+  }
+
+  table td:nth-child(2),
+  table th:nth-child(2),
+  table td:nth-child(3),
+  table th:nth-child(3) {
+    padding: 6px 2px;
+    font-size: 0.6rem;
+  }
+
+  .sl-input {
+    max-width: 60px;
+    font-size: 0.7rem;
+    padding: 3px 4px;
+  }
+
+  .exit-btn {
+    padding: 3px 6px;
+    font-size: 0.65rem;
   }
 
   .metrics-grid {
