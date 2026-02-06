@@ -80,15 +80,32 @@
   </div>
 
   <section id="positions">
-    <h2>Open Positions</h2>
+    <div class="section-header-with-controls">
+      <h2>Open Positions</h2>
+      <div class="price-update-controls">
+        <span id="priceUpdateStatus" class="price-status">Live prices updating...</span>
+        <button class="refresh-btn" onclick="manualRefreshPrices()" title="Refresh Prices Now">🔄</button>
+      </div>
+    </div>
     <table>
       <thead>
         <tr>
           <th>Stock</th><th>Entry Date</th><th>Days</th><th>Entry</th><th>LTP</th>
-          <th>SL</th><th>SL%</th><th>Qty</th><th>Invested</th><th>Risk (₹)</th><th>Action</th>
+          <th>SL</th><th>SL%</th><th>Qty</th><th>Invested</th><th>Current Value</th><th>P&L (₹)</th><th>P&L %</th><th>Risk (₹)</th><th>Action</th>
         </tr>
       </thead>
       <tbody id="positionsBody"></tbody>
+      <tfoot id="positionsFooter">
+        <tr class="totals-row">
+          <td colspan="8"><strong>TOTALS</strong></td>
+          <td id="totalInvested">₹0</td>
+          <td id="totalCurrentValue">₹0</td>
+          <td id="totalPnL" class="pnl-cell">₹0</td>
+          <td id="totalPnLPercent" class="pnl-cell">0%</td>
+          <td id="totalRisk">₹0</td>
+          <td></td>
+        </tr>
+      </tfoot>
     </table>
   </section>
 
@@ -154,6 +171,16 @@
   <section id="accountGrowth">
     <h2>📈 Account Growth</h2>
     <canvas id="growthChart"></canvas>
+  </section>
+
+  <section id="debugPanel">
+    <div class="section-header-with-controls">
+      <h2>🔍 Live Price Debug Logs</h2>
+      <button class="clear-logs-btn" onclick="debugLogs = []; updateDebugPanel();" title="Clear Logs">Clear</button>
+    </div>
+    <div id="debugLogs" class="debug-logs-container">
+      <div class="debug-log-entry log-info">Waiting for price updates...</div>
+    </div>
   </section>
 
 <!-- Chart.js -->

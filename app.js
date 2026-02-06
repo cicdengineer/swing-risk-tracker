@@ -154,16 +154,26 @@ function renderTrades() {
 
   let totalRisk = 0;
   let totalDeployed = 0;
+  let totalCurrentValue = 0;
+  let totalPnL = 0;
 
   trades.forEach(t => {
     const risk = Math.abs(t.entry - t.sl) * t.qty;
     const invested = t.entry * t.qty;
+    const currentValue = t.ltp * t.qty;
+    const pnl = currentValue - invested;
+    const pnlPercent = (pnl / invested) * 100;
+    
     totalRisk += risk;
     totalDeployed += invested;
+    totalCurrentValue += currentValue;
+    totalPnL += pnl;
     
     const slPercent = t.slPercent || ((Math.abs(t.entry - t.sl) / t.entry) * 100);
     const entryDate = formatDate(t.createdAt);
     const holdingDays = calculateHoldingDays(t.createdAt);
+    
+    const pnlClass = pnl >= 0 ? 'profit-text' : 'loss-text';
 
     body.innerHTML += `
       <tr>
@@ -176,10 +186,30 @@ function renderTrades() {
         <td id="slPercent-${t.id}">${slPercent.toFixed(2)}%</td>
         <td><strong>${t.qty}</strong></td>
         <td>₹${invested.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
+        <td>₹${currentValue.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
+        <td class="${pnlClass}">₹${pnl.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
+        <td class="${pnlClass}">${pnlPercent.toFixed(2)}%</td>
         <td id="risk-${t.id}">₹${risk.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
         <td><button class="exit-btn" onclick="exitTrade('${t.id}')">Exit</button></td>
       </tr>`;
   });
+
+  // Update totals in footer
+  const totalPnLPercent = totalDeployed > 0 ? (totalPnL / totalDeployed) * 100 : 0;
+  const totalPnLClass = totalPnL >= 0 ? 'profit-text' : 'loss-text';
+  
+  document.getElementById('totalInvested').innerText = `₹${totalDeployed.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+  document.getElementById('totalCurrentValue').innerText = `₹${totalCurrentValue.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+  
+  const totalPnLEl = document.getElementById('totalPnL');
+  totalPnLEl.innerText = `₹${totalPnL.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+  totalPnLEl.className = `pnl-cell ${totalPnLClass}`;
+  
+  const totalPnLPercentEl = document.getElementById('totalPnLPercent');
+  totalPnLPercentEl.innerText = `${totalPnLPercent.toFixed(2)}%`;
+  totalPnLPercentEl.className = `pnl-cell ${totalPnLClass}`;
+  
+  document.getElementById('totalRisk').innerText = `₹${totalRisk.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
 
   const portfolioRiskPct = (totalRisk / capital) * 100;
   document.getElementById("portfolioRisk").innerText =
@@ -574,8 +604,290 @@ function notifyRisk() {
   alert("⚠️ Portfolio risk exceeds 5%!");
 }
 
+// Live Price Fetching for NSE Stocks
+let priceUpdateInterval;
+const PRICE_UPDATE_INTERVAL = 30000; // Update every 30 seconds
+let debugLogs = [];
+
+function addDebugLog(message, type = 'info') {
+  const timestamp = new Date().toLocaleTimeString('en-IN');
+  const logEntry = `[${timestamp}] ${message}`;
+  debugLogs.unshift({ message: logEntry, type });
+  
+  // Keep only last 20 logs
+  if (debugLogs.length > 20) {
+    debugLogs.pop();
+  }
+  
+  console.log(`%c${logEntry}`, `color: ${type === 'error' ? '#ef4444' : type === 'success' ? '#22c55e' : '#3b82f6'}`);
+  updateDebugPanel();
+}
+
+function updateDebugPanel() {
+  const debugPanel = document.getElementById('debugLogs');
+  if (debugPanel) {
+    debugPanel.innerHTML = debugLogs.map(log => {
+      const colorClass = log.type === 'error' ? 'log-error' : log.type === 'success' ? 'log-success' : 'log-info';
+      return `<div class="debug-log-entry ${colorClass}">${log.message}</div>`;
+    }).join('');
+  }
+}
+
+// Check if current time is within market hours (9:15 AM - 3:30 PM IST)
+function isMarketOpen() {
+  const now = new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const currentTime = hours * 60 + minutes; // Convert to minutes since midnight
+  
+  const marketOpen = 9 * 60 + 15; // 9:15 AM
+  const marketClose = 15 * 60 + 30; // 3:30 PM
+  
+  // Check if it's a weekday (Monday = 1, Friday = 5)
+  const day = now.getDay();
+  const isWeekday = day >= 1 && day <= 5;
+  
+  return isWeekday && currentTime >= marketOpen && currentTime <= marketClose;
+}
+
+function updateMarketStatus() {
+  const statusEl = document.getElementById('priceUpdateStatus');
+  if (!statusEl) return;
+  
+  if (isMarketOpen()) {
+    statusEl.textContent = 'Live prices updating...';
+    statusEl.style.color = '#22c55e';
+  } else {
+    statusEl.textContent = 'Market Closed';
+    statusEl.style.color = '#ef4444';
+  }
+}
+
+async function fetchNSEPrice(symbol) {
+  try {
+    // Yahoo Finance API expects NSE symbols with .NS suffix
+    const yahooSymbol = `${symbol}.NS`;
+    
+    addDebugLog(`Fetching ${symbol} from Yahoo Finance...`, 'info');
+    
+    // Try multiple CORS proxies in order
+    const proxies = [
+      `https://corsproxy.io/?${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=1d`)}`,
+      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=1d`)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=1d`)}`
+    ];
+    
+    let data = null;
+    let lastError = null;
+    
+    // Try each proxy until one works
+    for (const proxyUrl of proxies) {
+      try {
+        const response = await fetch(proxyUrl);
+        if (response.ok) {
+          data = await response.json();
+          break; // Success, exit loop
+        }
+      } catch (err) {
+        lastError = err;
+        continue; // Try next proxy
+      }
+    }
+    
+    if (!data) {
+      addDebugLog(`❌ All proxies failed for ${symbol}`, 'error');
+      if (lastError) console.error(`Last error for ${symbol}:`, lastError);
+      return null;
+    }
+    
+    // Log the raw response for debugging
+    console.log(`Raw API response for ${symbol}:`, data);
+    
+    // Extract the latest price from the response
+    if (data.chart && data.chart.result && data.chart.result[0]) {
+      const result = data.chart.result[0];
+      const meta = result.meta;
+      
+      // Try to get regular market price, fallback to previous close
+      const price = meta.regularMarketPrice || meta.previousClose || meta.chartPreviousClose;
+      
+      if (price && price > 0) {
+        addDebugLog(`✅ ${symbol}: ₹${parseFloat(price).toFixed(2)}`, 'success');
+        return parseFloat(price);
+      } else {
+        addDebugLog(`⚠️ ${symbol}: No valid price in response`, 'error');
+      }
+    } else {
+      addDebugLog(`⚠️ ${symbol}: Invalid response structure`, 'error');
+    }
+    
+    return null;
+  } catch (error) {
+    addDebugLog(`❌ Error fetching ${symbol}: ${error.message}`, 'error');
+    console.error(`Detailed error for ${symbol}:`, error);
+    return null;
+  }
+}
+
+async function updateAllPrices() {
+  // Check if market is open
+  if (!isMarketOpen()) {
+    const statusEl = document.getElementById('priceUpdateStatus');
+    if (statusEl) {
+      statusEl.textContent = 'Market Closed';
+      statusEl.style.color = '#ef4444';
+    }
+    addDebugLog('⏸️ Market closed - skipping price update', 'info');
+    return;
+  }
+  
+  if (trades.length === 0) {
+    addDebugLog('⚠️ No open positions to update', 'info');
+    return;
+  }
+  
+  // Update status indicator
+  const statusEl = document.getElementById('priceUpdateStatus');
+  if (statusEl) {
+    statusEl.textContent = 'Fetching prices...';
+    statusEl.style.color = '#f59e0b';
+  }
+  
+  addDebugLog(`🔄 Starting price update for ${trades.length} stock(s)`, 'info');
+  
+  let updatedCount = 0;
+  let unchangedCount = 0;
+  let failedCount = 0;
+  
+  // Fetch prices for all open positions
+  const pricePromises = trades.map(async (trade) => {
+    const newPrice = await fetchNSEPrice(trade.symbol);
+    
+    if (newPrice === null) {
+      failedCount++;
+      return false;
+    }
+    
+    if (newPrice !== trade.ltp) {
+      // Update in Firebase
+      try {
+        await db.collection(TRADES_COLLECTION).doc(trade.id).update({
+          ltp: newPrice
+        });
+        
+        // Update local trade object
+        const oldPrice = trade.ltp;
+        trade.ltp = newPrice;
+        
+        const change = ((newPrice - oldPrice) / oldPrice * 100).toFixed(2);
+        const changeSymbol = newPrice > oldPrice ? '📈' : '📉';
+        addDebugLog(`${changeSymbol} ${trade.symbol} updated: ₹${oldPrice.toFixed(2)} → ₹${newPrice.toFixed(2)} (${change}%)`, 'success');
+        updatedCount++;
+        return true;
+      } catch (error) {
+        addDebugLog(`❌ Failed to save ${trade.symbol} to Firebase: ${error.message}`, 'error');
+        failedCount++;
+        return false;
+      }
+    } else {
+      unchangedCount++;
+      return false;
+    }
+  });
+  
+  // Wait for all updates to complete
+  await Promise.all(pricePromises);
+  
+  // Re-render the table with updated prices
+  renderTrades();
+  
+  // Summary log
+  addDebugLog(`✓ Update complete: ${updatedCount} changed, ${unchangedCount} unchanged, ${failedCount} failed`, updatedCount > 0 ? 'success' : 'info');
+  
+  // Update status indicator
+  if (statusEl) {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    statusEl.textContent = `Updated at ${timeStr}`;
+    statusEl.style.color = updatedCount > 0 ? '#22c55e' : '#94a3b8';
+    
+    // Revert to market status after 3 seconds
+    setTimeout(() => {
+      updateMarketStatus();
+    }, 3000);
+  }
+}
+
+function startPriceUpdates() {
+  addDebugLog(`🚀 Live price updates enabled (${PRICE_UPDATE_INTERVAL / 1000}s interval)`, 'info');
+  
+  // Check and log initial market status
+  if (isMarketOpen()) {
+    addDebugLog('✅ Market is open - prices will update automatically', 'success');
+  } else {
+    addDebugLog('⏸️ Market closed (9:15 AM - 3:30 PM) - updates paused', 'info');
+  }
+  
+  // Update status display
+  updateMarketStatus();
+  
+  // Initial update after 2 seconds (only if market is open)
+  setTimeout(() => {
+    updateAllPrices();
+  }, 2000);
+  
+  // Set up periodic updates
+  if (priceUpdateInterval) {
+    clearInterval(priceUpdateInterval);
+  }
+  
+  priceUpdateInterval = setInterval(() => {
+    if (trades.length > 0) {
+      updateAllPrices();
+    } else {
+      // Update market status even when no trades
+      updateMarketStatus();
+    }
+  }, PRICE_UPDATE_INTERVAL);
+}
+
+function stopPriceUpdates() {
+  if (priceUpdateInterval) {
+    clearInterval(priceUpdateInterval);
+    priceUpdateInterval = null;
+    addDebugLog('⏸️ Price updates stopped', 'info');
+  }
+}
+
+// Manual refresh with market hours check
+function manualRefreshPrices() {
+  if (!isMarketOpen()) {
+    const now = new Date();
+    const day = now.getDay();
+    
+    let message = 'Market is currently closed.\n\n';
+    if (day === 0 || day === 6) {
+      message += 'Markets are closed on weekends.\n';
+    }
+    message += 'Trading hours: Monday-Friday, 9:15 AM - 3:30 PM';
+    
+    alert(message);
+    addDebugLog('⚠️ Manual refresh blocked - Market closed', 'info');
+    return;
+  }
+  
+  addDebugLog('🔄 Manual refresh triggered', 'info');
+  updateAllPrices();
+}
+
 // Initialize app
+addDebugLog('🎯 Swing Risk Tracker initialized', 'info');
 loadSettings();
 loadTrades();
 loadClosedTrades();
+
+// Start live price updates after initial load
+setTimeout(() => {
+  startPriceUpdates();
+}, 2000); // Wait 2 seconds after page load to start updates
 
