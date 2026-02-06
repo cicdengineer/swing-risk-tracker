@@ -1,0 +1,28 @@
+body.dark {
+  background: #0f172a;
+  color: #e5e7eb;
+  font-family: system-ui;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+td, th {
+  border: 1px solid #334155;
+  padding: 8px;
+}
+
+button {
+  background: #22c55e;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+}
