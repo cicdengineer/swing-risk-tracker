@@ -22,6 +22,43 @@ const SETTINGS_DOC = "settings/userSettings";
 let capital = 1000000;
 let riskPerTrade = 2;
 
+const THEME_STORAGE_KEY = 'theme';
+const THEME_DARK = 'dark';
+const THEME_LIGHT = 'light';
+
+function applyTheme(theme) {
+  const body = document.body;
+  const toggle = document.getElementById('themeToggle');
+  if (!body) return;
+
+  body.classList.remove(THEME_DARK, THEME_LIGHT);
+  body.classList.add(theme);
+
+  if (toggle) {
+    const isDark = theme === THEME_DARK;
+    toggle.textContent = isDark ? '🌙' : '☀️';
+    toggle.setAttribute('aria-label', isDark ? 'Switch to light theme' : 'Switch to dark theme');
+    toggle.setAttribute('title', isDark ? 'Switch to light theme' : 'Switch to dark theme');
+  }
+}
+
+function initThemeToggle() {
+  const toggle = document.getElementById('themeToggle');
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+  const initialTheme = savedTheme || (prefersDark ? THEME_DARK : THEME_LIGHT);
+
+  applyTheme(initialTheme);
+
+  if (!toggle) return;
+
+  toggle.addEventListener('click', () => {
+    const nextTheme = document.body.classList.contains(THEME_DARK) ? THEME_LIGHT : THEME_DARK;
+    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    applyTheme(nextTheme);
+  });
+}
+
 // Load settings from localStorage or use defaults
 function loadSettings() {
   const savedCapital = localStorage.getItem('capital');
@@ -881,6 +918,7 @@ function manualRefreshPrices() {
 }
 
 // Initialize app
+initThemeToggle();
 addDebugLog('🎯 Swing Risk Tracker initialized', 'info');
 loadSettings();
 loadTrades();
