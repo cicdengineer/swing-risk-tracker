@@ -243,8 +243,8 @@ function checkSession() {
 }
 
 // Default settings
-let capital = 1000000;
-let riskPerTrade = 2;
+let capital = 10000000;
+let riskPerTrade = 0.2;
 
 const THEME_STORAGE_KEY = 'theme';
 const THEME_DARK = 'dark';
