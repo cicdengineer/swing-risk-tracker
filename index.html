@@ -9,8 +9,28 @@
 
   <header>
     <h1>Swing Risk Tracker</h1>
-    <button id="themeToggle" aria-label="Toggle theme" title="Toggle theme">🌙</button>
+    <div class="header-actions">
+      <span id="userDisplay" class="user-display" style="display: none;"></span>
+      <button id="themeToggle" aria-label="Toggle theme" title="Toggle theme">🌙</button>
+      <button id="loginLogoutBtn" class="login-btn">Login</button>
+    </div>
   </header>
+
+  <!-- Login Modal -->
+  <div id="loginModal" class="modal">
+    <div class="modal-content">
+      <h2>🔐 Login</h2>
+      <div id="loginError" class="error-message" style="display: none;"></div>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <input type="text" id="loginUsername" placeholder="Username" required autocomplete="username" />
+        <input type="password" id="loginPassword" placeholder="Password" required autocomplete="current-password" />
+        <div class="modal-actions">
+          <button type="submit" class="primary-btn">Login</button>
+          <button type="button" class="secondary-btn" onclick="closeLoginModal()">View Only</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <div class="top-controls">
     <div class="left-column">
@@ -44,6 +64,23 @@
             <h3>Deployed</h3>
             <div id="deployedCapital" class="risk-value">₹0</div>
           </div>
+        </div>
+      </section>
+
+      <section id="userManagement" style="display: none;">
+        <h2>👥 User Management</h2>
+        <div class="user-management-form">
+          <h3>Add New User</h3>
+          <input id="newUsername" placeholder="Username" />
+          <input id="newPassword" type="password" placeholder="Password" />
+          <button onclick="addUser()">Add User</button>
+        </div>
+        <div class="user-management-form">
+          <h3>Change Password</h3>
+          <input id="changePasswordUser" placeholder="Username" />
+          <input id="changePasswordOld" type="password" placeholder="Current Password" />
+          <input id="changePasswordNew" type="password" placeholder="New Password" />
+          <button onclick="changePassword()">Change Password</button>
         </div>
       </section>
     </div>

@@ -17,6 +17,346 @@ let closedTrades = [];
 const TRADES_COLLECTION = "trades";
 const CLOSED_TRADES_COLLECTION = "closedTrades";
 const SETTINGS_DOC = "settings/userSettings";
+const USERS_COLLECTION = "users";
+
+// Authentication state
+let currentUser = null;
+const SESSION_STORAGE_KEY = 'currentUser';
+
+// Simple password encoding (for basic security)
+function encodePassword(password) {
+  return btoa(password); // Base64 encoding
+}
+
+function decodePassword(encoded) {
+  return atob(encoded); // Base64 decoding
+}
+
+// Initialize default user
+async function initializeDefaultUser() {
+  try {
+    const usersSnapshot = await db.collection(USERS_COLLECTION).get();
+    
+    if (usersSnapshot.empty) {
+      // Create default user
+      await db.collection(USERS_COLLECTION).doc('akki').set({
+        username: 'akki',
+        password: encodePassword('akki@1'),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      addDebugLog('✅ Default user "akki" created', 'success');
+    }
+  } catch (error) {
+    console.error('Error initializing default user:', error);
+    addDebugLog('❌ Error initializing users: ' + error.message, 'error');
+  }
+}
+
+// Check if user is logged in
+function isLoggedIn() {
+  return currentUser !== null;
+}
+
+// Login function
+async function handleLogin(event) {
+  event.preventDefault();
+  
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errorDiv = document.getElementById('loginError');
+  
+  if (!username || !password) {
+    errorDiv.textContent = 'Please enter username and password';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  try {
+    const userDoc = await db.collection(USERS_COLLECTION).doc(username).get();
+    
+    if (!userDoc.exists) {
+      errorDiv.textContent = 'Invalid username or password';
+      errorDiv.style.display = 'block';
+      return;
+    }
+    
+    const userData = userDoc.data();
+    const storedPassword = decodePassword(userData.password);
+    
+    if (password !== storedPassword) {
+      errorDiv.textContent = 'Invalid username or password';
+      errorDiv.style.display = 'block';
+      return;
+    }
+    
+    // Login successful
+    currentUser = username;
+    sessionStorage.setItem(SESSION_STORAGE_KEY, username);
+    
+    closeLoginModal();
+    updateUIForAuthState();
+    addDebugLog(`✅ User "${username}" logged in`, 'success');
+    
+    // Clear form
+    document.getElementById('loginForm').reset();
+    errorDiv.style.display = 'none';
+    
+  } catch (error) {
+    console.error('Login error:', error);
+    errorDiv.textContent = 'Login failed. Please try again.';
+    errorDiv.style.display = 'block';
+  }
+}
+
+// Logout function
+function handleLogout() {
+  currentUser = null;
+  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  updateUIForAuthState();
+  addDebugLog('👋 User logged out', 'info');
+}
+
+// Open/Close login modal
+function openLoginModal() {
+  document.getElementById('loginModal').style.display = 'block';
+}
+
+function closeLoginModal() {
+  document.getElementById('loginModal').style.display = 'none';
+  document.getElementById('loginError').style.display = 'none';
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+  const modal = document.getElementById('loginModal');
+  if (event.target === modal) {
+    closeLoginModal();
+  }
+}
+
+// Update UI based on authentication state
+function updateUIForAuthState() {
+  const loginLogoutBtn = document.getElementById('loginLogoutBtn');
+  const userDisplay = document.getElementById('userDisplay');
+  const userManagement = document.getElementById('userManagement');
+  
+  if (isLoggedIn()) {
+    // User is logged in
+    loginLogoutBtn.textContent = 'Logout';
+    loginLogoutBtn.className = 'logout-btn';
+    loginLogoutBtn.onclick = handleLogout;
+    
+    userDisplay.textContent = `👤 ${currentUser}`;
+    userDisplay.style.display = 'block';
+    
+    // Show user management
+    if (userManagement) {
+      userManagement.style.display = 'block';
+    }
+    
+    // Enable all controls
+    enableControls();
+    
+  } else {
+    // User is not logged in
+    loginLogoutBtn.textContent = 'Login';
+    loginLogoutBtn.className = 'login-btn';
+    loginLogoutBtn.onclick = openLoginModal;
+    
+    userDisplay.style.display = 'none';
+    
+    // Hide user management
+    if (userManagement) {
+      userManagement.style.display = 'none';
+    }
+    
+    // Disable all controls (view-only mode)
+    disableControls();
+  }
+}
+
+// Disable controls for view-only mode
+function disableControls() {
+  // Disable add trade section
+  const addTradeInputs = document.querySelectorAll('#addTrade input, #addTrade button');
+  addTradeInputs.forEach(el => {
+    el.disabled = true;
+    el.classList.add('disabled-for-view-only');
+  });
+  
+  // Disable settings inputs
+  const settingsInputs = document.querySelectorAll('#settings input');
+  settingsInputs.forEach(el => {
+    el.disabled = true;
+    el.classList.add('disabled-for-view-only');
+  });
+  
+  // Disable exit buttons (will be applied when trades are rendered)
+  const exitButtons = document.querySelectorAll('.exit-btn');
+  exitButtons.forEach(btn => {
+    btn.disabled = true;
+    btn.classList.add('disabled-for-view-only');
+  });
+  
+  // Disable SL inputs (will be applied when trades are rendered)
+  const slInputs = document.querySelectorAll('.sl-input');
+  slInputs.forEach(input => {
+    input.disabled = true;
+    input.classList.add('disabled-for-view-only');
+  });
+}
+
+// Enable controls for logged-in users
+function enableControls() {
+  // Enable add trade section
+  const addTradeInputs = document.querySelectorAll('#addTrade input, #addTrade button');
+  addTradeInputs.forEach(el => {
+    el.disabled = false;
+    el.classList.remove('disabled-for-view-only');
+  });
+  
+  // Enable settings inputs
+  const settingsInputs = document.querySelectorAll('#settings input');
+  settingsInputs.forEach(el => {
+    el.disabled = false;
+    el.classList.remove('disabled-for-view-only');
+  });
+  
+  // Enable exit buttons (will be applied when trades are rendered)
+  const exitButtons = document.querySelectorAll('.exit-btn');
+  exitButtons.forEach(btn => {
+    btn.disabled = false;
+    btn.classList.remove('disabled-for-view-only');
+  });
+  
+  // Enable SL inputs (will be applied when trades are rendered)
+  const slInputs = document.querySelectorAll('.sl-input');
+  slInputs.forEach(input => {
+    input.disabled = false;
+    input.classList.remove('disabled-for-view-only');
+  });
+}
+
+// Add new user
+async function addUser() {
+  if (!isLoggedIn()) {
+    alert('Please login to add users');
+    return;
+  }
+  
+  const username = document.getElementById('newUsername').value.trim();
+  const password = document.getElementById('newPassword').value;
+  
+  if (!username || !password) {
+    alert('Please enter username and password');
+    return;
+  }
+  
+  if (password.length < 4) {
+    alert('Password must be at least 4 characters long');
+    return;
+  }
+  
+  try {
+    // Check if user already exists
+    const userDoc = await db.collection(USERS_COLLECTION).doc(username).get();
+    
+    if (userDoc.exists) {
+      alert('Username already exists');
+      return;
+    }
+    
+    // Create new user
+    await db.collection(USERS_COLLECTION).doc(username).set({
+      username: username,
+      password: encodePassword(password),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    alert(`User "${username}" added successfully!`);
+    addDebugLog(`✅ New user "${username}" added`, 'success');
+    
+    // Clear form
+    document.getElementById('newUsername').value = '';
+    document.getElementById('newPassword').value = '';
+    
+  } catch (error) {
+    console.error('Error adding user:', error);
+    alert('Failed to add user: ' + error.message);
+  }
+}
+
+// Change password
+async function changePassword() {
+  if (!isLoggedIn()) {
+    alert('Please login to change password');
+    return;
+  }
+  
+  const username = document.getElementById('changePasswordUser').value.trim();
+  const oldPassword = document.getElementById('changePasswordOld').value;
+  const newPassword = document.getElementById('changePasswordNew').value;
+  
+  if (!username || !oldPassword || !newPassword) {
+    alert('Please fill all fields');
+    return;
+  }
+  
+  if (newPassword.length < 4) {
+    alert('New password must be at least 4 characters long');
+    return;
+  }
+  
+  try {
+    const userDoc = await db.collection(USERS_COLLECTION).doc(username).get();
+    
+    if (!userDoc.exists) {
+      alert('User not found');
+      return;
+    }
+    
+    const userData = userDoc.data();
+    const storedPassword = decodePassword(userData.password);
+    
+    if (oldPassword !== storedPassword) {
+      alert('Current password is incorrect');
+      return;
+    }
+    
+    // Update password
+    await db.collection(USERS_COLLECTION).doc(username).update({
+      password: encodePassword(newPassword),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    alert(`Password for "${username}" changed successfully!`);
+    addDebugLog(`✅ Password changed for "${username}"`, 'success');
+    
+    // Clear form
+    document.getElementById('changePasswordUser').value = '';
+    document.getElementById('changePasswordOld').value = '';
+    document.getElementById('changePasswordNew').value = '';
+    
+  } catch (error) {
+    console.error('Error changing password:', error);
+    alert('Failed to change password: ' + error.message);
+  }
+}
+
+// Check session on page load
+function checkSession() {
+  const savedUser = sessionStorage.getItem(SESSION_STORAGE_KEY);
+  if (savedUser) {
+    currentUser = savedUser;
+    updateUIForAuthState();
+  } else {
+    updateUIForAuthState();
+    // Show login modal on first load
+    setTimeout(() => {
+      openLoginModal();
+    }, 1000);
+  }
+}
 
 // Default settings
 let capital = 1000000;
@@ -73,10 +413,18 @@ function loadSettings() {
 }
 
 function updateCapital() {
+  if (!isLoggedIn()) {
+    return;
+  }
+  
   capital = parseFloat(document.getElementById('capitalInput').value) || 0;
   localStorage.setItem('capital', capital);
   updateMaxRiskDisplay();
   calculatePreview();
+  if (!isLoggedIn()) {
+    return;
+  }
+  
   renderTrades();
 }
 
@@ -138,6 +486,12 @@ function calculatePreview() {
 }
 
 function addTrade() {
+  if (!isLoggedIn()) {
+    alert('Please login to add trades');
+    openLoginModal();
+    return;
+  }
+  
   const entry = parseFloat(document.getElementById("entry").value);
   const sl = parseFloat(document.getElementById("sl").value);
   const symbol = document.getElementById("symbol").value.trim().toUpperCase();
@@ -212,6 +566,10 @@ function renderTrades() {
     
     const pnlClass = pnl >= 0 ? 'profit-text' : 'loss-text';
 
+    const slInputDisabled = !isLoggedIn() ? 'disabled' : '';
+    const exitBtnDisabled = !isLoggedIn() ? 'disabled' : '';
+    const disabledClass = !isLoggedIn() ? 'disabled-for-view-only' : '';
+
     body.innerHTML += `
       <tr>
         <td><strong>${t.symbol}</strong></td>
@@ -219,7 +577,7 @@ function renderTrades() {
         <td>${holdingDays}</td>
         <td>₹${t.entry.toFixed(2)}</td>
         <td>₹${t.ltp.toFixed(2)}</td>
-        <td><input type="number" class="sl-input" value="${t.sl.toFixed(2)}" step="0.01" onchange="updateSL('${t.id}', this.value)" /></td>
+        <td><input type="number" class="sl-input ${disabledClass}" value="${t.sl.toFixed(2)}" step="0.01" onchange="updateSL('${t.id}', this.value)" ${slInputDisabled} /></td>
         <td id="slPercent-${t.id}">${slPercent.toFixed(2)}%</td>
         <td><strong>${t.qty}</strong></td>
         <td>₹${invested.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
@@ -227,7 +585,7 @@ function renderTrades() {
         <td class="${pnlClass}">₹${pnl.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
         <td class="${pnlClass}">${pnlPercent.toFixed(2)}%</td>
         <td id="risk-${t.id}">₹${risk.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
-        <td><button class="exit-btn" onclick="exitTrade('${t.id}')">Exit</button></td>
+        <td><button class="exit-btn ${disabledClass}" onclick="exitTrade('${t.id}')" ${exitBtnDisabled}>Exit</button></td>
       </tr>`;
   });
 
@@ -255,6 +613,11 @@ function renderTrades() {
   document.getElementById("deployedCapital").innerText =
     `₹${totalDeployed.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
 
+  if (!isLoggedIn()) {
+    alert('Please login to update stop loss');
+    return;
+  }
+  
   if (portfolioRiskPct > 5) notifyRisk();
 }
 
@@ -330,6 +693,11 @@ function renderClosedTrades() {
 }
 
 function exitTrade(tradeId) {
+  if (!isLoggedIn()) {
+    alert('Please login to exit trades');
+    return;
+  }
+  
   const trade = trades.find(t => t.id === tradeId);
   if (!trade) {
     alert('Trade not found');
@@ -916,6 +1284,11 @@ function manualRefreshPrices() {
   addDebugLog('🔄 Manual refresh triggered', 'info');
   updateAllPrices();
 }
+
+// Initialize authentication
+initializeDefaultUser();
+checkSession();
+
 
 // Initialize app
 initThemeToggle();

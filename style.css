@@ -1165,3 +1165,319 @@ body.light .preview-value {
     font-size: 0.6rem;
   }
 }
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-display {
+  font-size: 0.85rem;
+  color: #22c55e;
+  font-weight: 600;
+  padding: 6px 12px;
+  background: rgba(34, 197, 94, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+body.light .user-display {
+  color: #15803d;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.login-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  min-width: 80px;
+}
+
+.login-btn:hover {
+  box-shadow: 0 3px 12px rgba(59, 130, 246, 0.4);
+}
+
+.logout-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  min-width: 80px;
+}
+
+.logout-btn:hover {
+  box-shadow: 0 3px 12px rgba(239, 68, 68, 0.4);
+}
+
+/* Login Modal */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-content {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  margin: 10% auto;
+  padding: 30px;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  animation: slideDown 0.3s ease;
+}
+
+body.light .modal-content {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-color: rgba(34, 197, 94, 0.25);
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.2);
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-content h2 {
+  color: #22c55e;
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+  text-align: center;
+}
+
+body.light .modal-content h2 {
+  color: #15803d;
+}
+
+.modal-content input {
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 15px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #e5e7eb;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+body.light .modal-content input {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(148, 163, 184, 0.6);
+  color: #0f172a;
+}
+
+.modal-content input:focus {
+  border-color: #22c55e;
+  background: rgba(15, 23, 42, 0.8);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+body.light .modal-content input:focus {
+  background: rgba(255, 255, 255, 1);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-actions button {
+  flex: 1;
+  padding: 12px;
+  font-size: 0.95rem;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
+}
+
+.secondary-btn {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+}
+
+.error-message {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+body.light .error-message {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+/* User Management */
+.user-management-form {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.light .user-management-form {
+  background: rgba(248, 250, 252, 0.9);
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.user-management-form h3 {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+body.light .user-management-form h3 {
+  color: #64748b;
+}
+
+.user-management-form input {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #e5e7eb;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+body.light .user-management-form input {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(148, 163, 184, 0.6);
+  color: #0f172a;
+}
+
+.user-management-form input:focus {
+  border-color: #22c55e;
+  background: rgba(15, 23, 42, 0.8);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+body.light .user-management-form input:focus {
+  background: rgba(255, 255, 255, 1);
+}
+
+/* Disabled State for Non-Logged-In Users */
+.disabled-for-view-only {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed !important;
+}
+
+.view-only-overlay {
+  position: relative;
+}
+
+.view-only-overlay::after {
+  content: '🔒 Login to edit';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(239, 68, 68, 0.95);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.view-only-overlay:hover::after {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .header-actions {
+    gap: 6px;
+  }
+
+  .user-display {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+
+  .login-btn,
+  .logout-btn {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    min-width: 60px;
+  }
+
+  .modal-content {
+    padding: 20px;
+    margin: 20% auto;
+  }
+
+  .modal-content h2 {
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-actions {
+    gap: 4px;
+  }
+
+  .user-display {
+    display: none !important;
+  }
+
+  .login-btn,
+  .logout-btn {
+    padding: 5px 10px;
+    font-size: 0.7rem;
+    min-width: 50px;
+  }
+
+  .modal-content {
+    width: 95%;
+    padding: 18px;
+  }
+}
