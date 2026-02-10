@@ -428,6 +428,8 @@ const TRADINGVIEW_CHART_ID = '05Iji3dY';
 // Industry Allocation Chart
 let industryChart = null;
 const INDUSTRY_CACHE_KEY = 'industryCache';
+const INDUSTRY_LIST_CACHE_KEY = 'industryListCache';
+const INDUSTRY_LIST_TTL_MS = 24 * 60 * 60 * 1000;
 
 function openTradingViewChart(symbol) {
   const nseSymbol = `NSE:${symbol}`;
@@ -449,13 +451,165 @@ function saveIndustryCache(cache) {
   localStorage.setItem(INDUSTRY_CACHE_KEY, JSON.stringify(cache));
 }
 
-async function fetchIndustry(symbol) {
-  const cache = loadIndustryCache();
-  if (cache[symbol]) {
-    return cache[symbol];
+function normalizeSymbol(symbol) {
+  return symbol
+    .replace(/^NSE:/i, '')
+    .replace(/\.NS$/i, '')
+    .replace(/\.BO$/i, '')
+    .trim()
+    .toUpperCase();
+}
+
+function parseCsvLine(line) {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      const nextChar = line[i + 1];
+      if (inQuotes && nextChar === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      values.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
   }
 
-  const yahooSymbol = `${symbol}.NS`;
+  values.push(current);
+  return values.map(value => value.trim());
+}
+
+function parseIndustryCsv(csvText) {
+  const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
+  if (lines.length === 0) {
+    return {};
+  }
+
+  const header = parseCsvLine(lines[0]);
+  const symbolIndex = header.findIndex(col => col.toUpperCase() === 'SYMBOL');
+  const industryIndex = header.findIndex(col => col.toUpperCase() === 'INDUSTRY');
+
+  if (symbolIndex === -1 || industryIndex === -1) {
+    return {};
+  }
+
+  const map = {};
+  for (let i = 1; i < lines.length; i++) {
+    const row = parseCsvLine(lines[i]);
+    const symbol = row[symbolIndex];
+    const industry = row[industryIndex];
+    if (symbol && industry) {
+      map[normalizeSymbol(symbol)] = industry;
+    }
+  }
+
+  return map;
+}
+
+function loadIndustryListCache() {
+  try {
+    const raw = localStorage.getItem(INDUSTRY_LIST_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.updatedAt || !parsed.data) {
+      return null;
+    }
+    if (Date.now() - parsed.updatedAt > INDUSTRY_LIST_TTL_MS) {
+      return null;
+    }
+    return parsed.data;
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveIndustryListCache(data) {
+  localStorage.setItem(
+    INDUSTRY_LIST_CACHE_KEY,
+    JSON.stringify({ updatedAt: Date.now(), data })
+  );
+}
+
+async function fetchIndustryFromNseList(symbol) {
+  const normalized = normalizeSymbol(symbol);
+  const cached = loadIndustryListCache();
+  if (cached && cached[normalized]) {
+    return cached[normalized];
+  }
+
+  if (cached) {
+    return null;
+  }
+
+  const nseListUrl = 'https://archives.nseindia.com/content/equities/EQUITY_L.csv';
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(nseListUrl)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(nseListUrl)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(nseListUrl)}`
+  ];
+
+  let csvText = null;
+  for (const proxyUrl of proxies) {
+    try {
+      const response = await fetch(proxyUrl);
+      if (response.ok) {
+        csvText = await response.text();
+        break;
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+
+  if (!csvText) {
+    return null;
+  }
+
+  const map = parseIndustryCsv(csvText);
+  if (Object.keys(map).length > 0) {
+    saveIndustryListCache(map);
+  }
+
+  return map[normalized] || null;
+}
+
+function getYahooSymbol(symbol) {
+  const normalized = normalizeSymbol(symbol);
+  if (symbol.toUpperCase().includes('.BO')) {
+    return `${normalized}.BO`;
+  }
+  return `${normalized}.NS`;
+}
+
+async function fetchIndustry(symbol) {
+  const cache = loadIndustryCache();
+  const cacheKey = normalizeSymbol(symbol);
+  if (cache[cacheKey] && cache[cacheKey] !== 'Unknown') {
+    return cache[cacheKey];
+  }
+
+  const nseIndustry = await fetchIndustryFromNseList(cacheKey);
+  if (nseIndustry) {
+    cache[cacheKey] = nseIndustry;
+    saveIndustryCache(cache);
+    return nseIndustry;
+  }
+
+  const yahooSymbol = getYahooSymbol(symbol);
   const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${yahooSymbol}?modules=assetProfile`;
   const proxies = [
     `https://corsproxy.io/?${encodeURIComponent(url)}`,
@@ -482,7 +636,7 @@ async function fetchIndustry(symbol) {
     industry = profile.industry || profile.sector || 'Unknown';
   }
 
-  cache[symbol] = industry;
+  cache[cacheKey] = industry;
   saveIndustryCache(cache);
   return industry;
 }
