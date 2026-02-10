@@ -462,6 +462,7 @@ function renderTrades() {
     const slInputDisabled = !isLoggedIn() ? 'disabled' : '';
     const exitBtnDisabled = !isLoggedIn() ? 'disabled' : '';
     const disabledClass = !isLoggedIn() ? 'disabled-for-view-only' : '';
+    const slOnChange = isLoggedIn() ? `onchange="updateSL('${t.id}', this.value)"` : '';
 
     body.innerHTML += `
       <tr>
@@ -470,7 +471,7 @@ function renderTrades() {
         <td>${holdingDays}</td>
         <td>₹${t.entry.toFixed(2)}</td>
         <td>₹${t.ltp.toFixed(2)}</td>
-        <td><input type="number" class="sl-input ${disabledClass}" value="${t.sl.toFixed(2)}" step="0.01" onchange="updateSL('${t.id}', this.value)" ${slInputDisabled} /></td>
+        <td><input type="number" class="sl-input ${disabledClass}" value="${t.sl.toFixed(2)}" step="0.01" ${slOnChange} ${slInputDisabled} /></td>
         <td id="slPercent-${t.id}">${slPercent.toFixed(2)}%</td>
         <td><strong>${t.qty}</strong></td>
         <td>₹${invested.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
@@ -505,16 +506,15 @@ function renderTrades() {
 
   document.getElementById("deployedCapital").innerText =
     `₹${totalDeployed.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
-
-  if (!isLoggedIn()) {
-    alert('Please login to update stop loss');
-    return;
-  }
   
   if (portfolioRiskPct > 5) notifyRisk();
 }
 
 function updateSL(tradeId, newSL) {
+  if (!isLoggedIn()) {
+    return;
+  }
+
   const sl = parseFloat(newSL);
   
   if (isNaN(sl) || sl <= 0) {
