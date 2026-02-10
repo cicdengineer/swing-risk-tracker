@@ -422,6 +422,16 @@ function addTrade() {
 }
 
 
+// TradingView Chart Configuration
+const TRADINGVIEW_CHART_ID = '05Iji3dY';
+
+function openTradingViewChart(symbol) {
+  const nseSymbol = `NSE:${symbol}`;
+  const encodedSymbol = encodeURIComponent(nseSymbol);
+  const tradingViewUrl = `https://in.tradingview.com/chart/${TRADINGVIEW_CHART_ID}/?symbol=${encodedSymbol}`;
+  window.open(tradingViewUrl, '_blank');
+}
+
 function renderTrades() {
   const body = document.getElementById("positionsBody");
   body.innerHTML = "";
@@ -455,7 +465,7 @@ function renderTrades() {
 
     body.innerHTML += `
       <tr>
-        <td><strong>${t.symbol}</strong></td>
+        <td><strong><a href="#" onclick="openTradingViewChart('${t.symbol}'); return false;" class="stock-link">${t.symbol}</a></strong></td>
         <td>${entryDate}</td>
         <td>${holdingDays}</td>
         <td>₹${t.entry.toFixed(2)}</td>
