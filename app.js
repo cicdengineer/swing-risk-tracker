@@ -460,9 +460,11 @@ function renderTrades() {
     const pnlClass = pnl >= 0 ? 'profit-text' : 'loss-text';
 
     const slInputDisabled = !isLoggedIn() ? 'disabled' : '';
+    const qtyInputDisabled = !isLoggedIn() ? 'disabled' : '';
     const exitBtnDisabled = !isLoggedIn() ? 'disabled' : '';
     const disabledClass = !isLoggedIn() ? 'disabled-for-view-only' : '';
     const slOnChange = isLoggedIn() ? `onchange="updateSL('${t.id}', this.value)"` : '';
+    const qtyOnChange = isLoggedIn() ? `onchange="updateQty('${t.id}', this.value)"` : '';
 
     body.innerHTML += `
       <tr>
@@ -473,7 +475,7 @@ function renderTrades() {
         <td>₹${t.ltp.toFixed(2)}</td>
         <td><input type="number" class="sl-input ${disabledClass}" value="${t.sl.toFixed(2)}" step="0.01" ${slOnChange} ${slInputDisabled} /></td>
         <td id="slPercent-${t.id}">${slPercent.toFixed(2)}%</td>
-        <td><strong>${t.qty}</strong></td>
+        <td><input type="number" class="qty-input ${disabledClass}" value="${t.qty}" step="1" min="1" ${qtyOnChange} ${qtyInputDisabled} /></td>
         <td>₹${invested.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
         <td>₹${currentValue.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
         <td class="${pnlClass}">₹${pnl.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
@@ -549,6 +551,40 @@ function updateSL(tradeId, newSL) {
   })
   .catch(err => {
     alert('Error updating stop loss: ' + err.message);
+    loadTrades(); // Reload to reset
+  });
+}
+
+function updateQty(tradeId, newQty) {
+  if (!isLoggedIn()) {
+    return;
+  }
+
+  const qty = parseInt(newQty);
+  
+  if (isNaN(qty) || qty <= 0) {
+    alert('Please enter a valid quantity (must be greater than 0)');
+    loadTrades(); // Reload to reset the input
+    return;
+  }
+
+  const trade = trades.find(t => t.id === tradeId);
+  if (!trade) {
+    alert('Trade not found');
+    return;
+  }
+
+  // Update in Firebase
+  db.collection(TRADES_COLLECTION).doc(tradeId).update({
+    qty: qty
+  })
+  .then(() => {
+    addDebugLog(`✅ Quantity updated for ${trade.symbol}: ${trade.qty} → ${qty}`, 'success');
+    // Reload to update all dependent calculations
+    loadTrades();
+  })
+  .catch(err => {
+    alert('Error updating quantity: ' + err.message);
     loadTrades(); // Reload to reset
   });
 }
