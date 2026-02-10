@@ -138,7 +138,6 @@ window.onclick = function(event) {
 function updateUIForAuthState() {
   const loginLogoutBtn = document.getElementById('loginLogoutBtn');
   const userDisplay = document.getElementById('userDisplay');
-  const userManagement = document.getElementById('userManagement');
   
   if (isLoggedIn()) {
     // User is logged in
@@ -148,11 +147,6 @@ function updateUIForAuthState() {
     
     userDisplay.textContent = `👤 ${currentUser}`;
     userDisplay.style.display = 'block';
-    
-    // Show user management
-    if (userManagement) {
-      userManagement.style.display = 'block';
-    }
     
     // Enable all controls
     enableControls();
@@ -164,11 +158,6 @@ function updateUIForAuthState() {
     loginLogoutBtn.onclick = openLoginModal;
     
     userDisplay.style.display = 'none';
-    
-    // Hide user management
-    if (userManagement) {
-      userManagement.style.display = 'none';
-    }
     
     // Disable all controls (view-only mode)
     disableControls();
@@ -235,112 +224,6 @@ function enableControls() {
     input.disabled = false;
     input.classList.remove('disabled-for-view-only');
   });
-}
-
-// Add new user
-async function addUser() {
-  if (!isLoggedIn()) {
-    alert('Please login to add users');
-    return;
-  }
-  
-  const username = document.getElementById('newUsername').value.trim();
-  const password = document.getElementById('newPassword').value;
-  
-  if (!username || !password) {
-    alert('Please enter username and password');
-    return;
-  }
-  
-  if (password.length < 4) {
-    alert('Password must be at least 4 characters long');
-    return;
-  }
-  
-  try {
-    // Check if user already exists
-    const userDoc = await db.collection(USERS_COLLECTION).doc(username).get();
-    
-    if (userDoc.exists) {
-      alert('Username already exists');
-      return;
-    }
-    
-    // Create new user
-    await db.collection(USERS_COLLECTION).doc(username).set({
-      username: username,
-      password: encodePassword(password),
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    
-    alert(`User "${username}" added successfully!`);
-    addDebugLog(`✅ New user "${username}" added`, 'success');
-    
-    // Clear form
-    document.getElementById('newUsername').value = '';
-    document.getElementById('newPassword').value = '';
-    
-  } catch (error) {
-    console.error('Error adding user:', error);
-    alert('Failed to add user: ' + error.message);
-  }
-}
-
-// Change password
-async function changePassword() {
-  if (!isLoggedIn()) {
-    alert('Please login to change password');
-    return;
-  }
-  
-  const username = document.getElementById('changePasswordUser').value.trim();
-  const oldPassword = document.getElementById('changePasswordOld').value;
-  const newPassword = document.getElementById('changePasswordNew').value;
-  
-  if (!username || !oldPassword || !newPassword) {
-    alert('Please fill all fields');
-    return;
-  }
-  
-  if (newPassword.length < 4) {
-    alert('New password must be at least 4 characters long');
-    return;
-  }
-  
-  try {
-    const userDoc = await db.collection(USERS_COLLECTION).doc(username).get();
-    
-    if (!userDoc.exists) {
-      alert('User not found');
-      return;
-    }
-    
-    const userData = userDoc.data();
-    const storedPassword = decodePassword(userData.password);
-    
-    if (oldPassword !== storedPassword) {
-      alert('Current password is incorrect');
-      return;
-    }
-    
-    // Update password
-    await db.collection(USERS_COLLECTION).doc(username).update({
-      password: encodePassword(newPassword),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    
-    alert(`Password for "${username}" changed successfully!`);
-    addDebugLog(`✅ Password changed for "${username}"`, 'success');
-    
-    // Clear form
-    document.getElementById('changePasswordUser').value = '';
-    document.getElementById('changePasswordOld').value = '';
-    document.getElementById('changePasswordNew').value = '';
-    
-  } catch (error) {
-    console.error('Error changing password:', error);
-    alert('Failed to change password: ' + error.message);
-  }
 }
 
 // Check session on page load

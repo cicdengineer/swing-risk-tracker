@@ -1344,61 +1344,6 @@ body.light .error-message {
   color: #dc2626;
 }
 
-/* User Management */
-.user-management-form {
-  margin-bottom: 20px;
-  padding: 15px;
-  background: rgba(15, 23, 42, 0.4);
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-body.light .user-management-form {
-  background: rgba(248, 250, 252, 0.9);
-  border-color: rgba(148, 163, 184, 0.3);
-}
-
-.user-management-form h3 {
-  color: #94a3b8;
-  font-size: 0.85rem;
-  margin-bottom: 10px;
-  font-weight: 600;
-}
-
-body.light .user-management-form h3 {
-  color: #64748b;
-}
-
-.user-management-form input {
-  width: 100%;
-  padding: 10px 12px;
-  margin-bottom: 10px;
-  background: rgba(15, 23, 42, 0.6);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #e5e7eb;
-  font-size: 0.9rem;
-  font-family: inherit;
-  transition: all 0.3s ease;
-  outline: none;
-}
-
-body.light .user-management-form input {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(148, 163, 184, 0.6);
-  color: #0f172a;
-}
-
-.user-management-form input:focus {
-  border-color: #22c55e;
-  background: rgba(15, 23, 42, 0.8);
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
-}
-
-body.light .user-management-form input:focus {
-  background: rgba(255, 255, 255, 1);
-}
-
 /* Disabled State for Non-Logged-In Users */
 .disabled-for-view-only {
   opacity: 0.5;
