@@ -430,6 +430,7 @@ let industryChart = null;
 const INDUSTRY_CACHE_KEY = 'industryCache';
 const INDUSTRY_LIST_CACHE_KEY = 'industryListCache';
 const INDUSTRY_LIST_TTL_MS = 24 * 60 * 60 * 1000;
+const industryLookupWarnings = new Set();
 
 function openTradingViewChart(symbol) {
   const nseSymbol = `NSE:${symbol}`;
@@ -559,7 +560,8 @@ async function fetchIndustryFromNseList(symbol) {
   const proxies = [
     `https://corsproxy.io/?${encodeURIComponent(nseListUrl)}`,
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(nseListUrl)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(nseListUrl)}`
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(nseListUrl)}`,
+    `https://r.jina.ai/http://${nseListUrl.replace(/^https?:\/\//, '')}`
   ];
 
   let csvText = null;
@@ -576,6 +578,10 @@ async function fetchIndustryFromNseList(symbol) {
   }
 
   if (!csvText) {
+    if (!industryLookupWarnings.has('nse-list-unavailable')) {
+      industryLookupWarnings.add('nse-list-unavailable');
+      addDebugLog('⚠️ Industry lookup: NSE list unavailable via proxies', 'error');
+    }
     return null;
   }
 
@@ -614,7 +620,8 @@ async function fetchIndustry(symbol) {
   const proxies = [
     `https://corsproxy.io/?${encodeURIComponent(url)}`,
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    `https://r.jina.ai/http://${url.replace(/^https?:\/\//, '')}`
   ];
 
   let data = null;
@@ -634,6 +641,14 @@ async function fetchIndustry(symbol) {
   if (data && data.quoteSummary && data.quoteSummary.result && data.quoteSummary.result[0]) {
     const profile = data.quoteSummary.result[0].assetProfile || {};
     industry = profile.industry || profile.sector || 'Unknown';
+  }
+
+  if (industry === 'Unknown') {
+    const warnKey = `industry-unknown-${cacheKey}`;
+    if (!industryLookupWarnings.has(warnKey)) {
+      industryLookupWarnings.add(warnKey);
+      addDebugLog(`⚠️ Industry lookup failed for ${cacheKey}`, 'error');
+    }
   }
 
   cache[cacheKey] = industry;
