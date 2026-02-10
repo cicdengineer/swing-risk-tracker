@@ -545,6 +545,27 @@ function saveIndustryListCache(data) {
   );
 }
 
+async function fetchJsonFromProxies(url, proxies) {
+  for (const proxyUrl of proxies) {
+    try {
+      const response = await fetch(proxyUrl);
+      if (!response.ok) {
+        continue;
+      }
+      const text = await response.text();
+      try {
+        return JSON.parse(text);
+      } catch (parseError) {
+        continue;
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+
+  return null;
+}
+
 async function fetchIndustryFromNseList(symbol) {
   const normalized = normalizeSymbol(symbol);
   const cached = loadIndustryListCache();
@@ -593,6 +614,39 @@ async function fetchIndustryFromNseList(symbol) {
   return map[normalized] || null;
 }
 
+function extractIndustryFromNseQuote(data) {
+  if (!data) {
+    return null;
+  }
+
+  const industryCandidates = [
+    data.industryInfo && (data.industryInfo.industry || data.industryInfo.basicIndustry),
+    data.info && (data.info.industry || data.info.sector),
+    data.companyInfo && data.companyInfo.industry,
+    data.metadata && data.metadata.industry
+  ].filter(Boolean);
+
+  if (industryCandidates.length === 0) {
+    return null;
+  }
+
+  const industry = String(industryCandidates[0]).trim();
+  return industry && industry !== '-' ? industry : null;
+}
+
+async function fetchIndustryFromNseQuote(symbol) {
+  const normalized = normalizeSymbol(symbol);
+  const nseQuoteUrl = `https://www.nseindia.com/api/quote-equity?symbol=${encodeURIComponent(normalized)}`;
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(nseQuoteUrl)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(nseQuoteUrl)}`,
+    `https://r.jina.ai/http://${nseQuoteUrl.replace(/^https?:\/\//, '')}`
+  ];
+
+  const data = await fetchJsonFromProxies(nseQuoteUrl, proxies);
+  return extractIndustryFromNseQuote(data);
+}
+
 function getYahooSymbol(symbol) {
   const normalized = normalizeSymbol(symbol);
   if (symbol.toUpperCase().includes('.BO')) {
@@ -615,6 +669,13 @@ async function fetchIndustry(symbol) {
     return nseIndustry;
   }
 
+  const nseQuoteIndustry = await fetchIndustryFromNseQuote(cacheKey);
+  if (nseQuoteIndustry) {
+    cache[cacheKey] = nseQuoteIndustry;
+    saveIndustryCache(cache);
+    return nseQuoteIndustry;
+  }
+
   const yahooSymbol = getYahooSymbol(symbol);
   const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${yahooSymbol}?modules=assetProfile`;
   const proxies = [
@@ -625,17 +686,7 @@ async function fetchIndustry(symbol) {
   ];
 
   let data = null;
-  for (const proxyUrl of proxies) {
-    try {
-      const response = await fetch(proxyUrl);
-      if (response.ok) {
-        data = await response.json();
-        break;
-      }
-    } catch (error) {
-      continue;
-    }
-  }
+  data = await fetchJsonFromProxies(url, proxies);
 
   let industry = 'Unknown';
   if (data && data.quoteSummary && data.quoteSummary.result && data.quoteSummary.result[0]) {
