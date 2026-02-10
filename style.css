@@ -830,6 +830,25 @@ body.light .metric-value {
   max-height: 300px;
 }
 
+#industryAllocation {
+  min-height: 280px;
+}
+
+#industryChart {
+  height: 260px !important;
+  max-height: 280px;
+}
+
+.chart-note {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+body.light .chart-note {
+  color: #64748b;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
@@ -1172,6 +1191,10 @@ body.light .preview-value {
     height: 220px !important;
   }
 
+  #industryChart {
+    height: 220px !important;
+  }
+
   .exit-btn {
     padding: 4px 8px;
     font-size: 0.7rem;
@@ -1276,6 +1299,10 @@ body.light .preview-value {
 
   .metric-value {
     font-size: 1rem;
+  }
+
+  #industryChart {
+    height: 200px !important;
   }
 
   .debug-logs-container {

@@ -425,11 +425,159 @@ function addTrade() {
 // TradingView Chart Configuration
 const TRADINGVIEW_CHART_ID = '05Iji3dY';
 
+// Industry Allocation Chart
+let industryChart = null;
+const INDUSTRY_CACHE_KEY = 'industryCache';
+
 function openTradingViewChart(symbol) {
   const nseSymbol = `NSE:${symbol}`;
   const encodedSymbol = encodeURIComponent(nseSymbol);
   const tradingViewUrl = `https://in.tradingview.com/chart/${TRADINGVIEW_CHART_ID}/?symbol=${encodedSymbol}`;
   window.open(tradingViewUrl, '_blank');
+}
+
+function loadIndustryCache() {
+  try {
+    const raw = localStorage.getItem(INDUSTRY_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveIndustryCache(cache) {
+  localStorage.setItem(INDUSTRY_CACHE_KEY, JSON.stringify(cache));
+}
+
+async function fetchIndustry(symbol) {
+  const cache = loadIndustryCache();
+  if (cache[symbol]) {
+    return cache[symbol];
+  }
+
+  const yahooSymbol = `${symbol}.NS`;
+  const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${yahooSymbol}?modules=assetProfile`;
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+  ];
+
+  let data = null;
+  for (const proxyUrl of proxies) {
+    try {
+      const response = await fetch(proxyUrl);
+      if (response.ok) {
+        data = await response.json();
+        break;
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+
+  let industry = 'Unknown';
+  if (data && data.quoteSummary && data.quoteSummary.result && data.quoteSummary.result[0]) {
+    const profile = data.quoteSummary.result[0].assetProfile || {};
+    industry = profile.industry || profile.sector || 'Unknown';
+  }
+
+  cache[symbol] = industry;
+  saveIndustryCache(cache);
+  return industry;
+}
+
+function getIndustryChartBorderColor() {
+  return document.body.classList.contains('light')
+    ? 'rgba(226, 232, 240, 1)'
+    : 'rgba(15, 23, 42, 0.9)';
+}
+
+function renderIndustryChart(labels, values) {
+  const canvas = document.getElementById('industryChart');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const palette = [
+    '#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#14b8a6',
+    '#a855f7', '#f97316', '#0ea5e9', '#84cc16', '#f43f5e'
+  ];
+
+  const borderColor = getIndustryChartBorderColor();
+  const data = {
+    labels: labels,
+    datasets: [{
+      data: values,
+      backgroundColor: labels.map((_, i) => palette[i % palette.length]),
+      borderColor: borderColor,
+      borderWidth: 2
+    }]
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: document.body.classList.contains('light') ? '#0f172a' : '#e5e7eb',
+          font: { size: 11 }
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
+            const value = context.parsed;
+            const percent = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+            return `${context.label}: ₹${value.toLocaleString('en-IN', {maximumFractionDigits: 0})} (${percent}%)`;
+          }
+        }
+      }
+    }
+  };
+
+  if (industryChart) {
+    industryChart.data = data;
+    industryChart.options = options;
+    industryChart.update();
+    return;
+  }
+
+  industryChart = new Chart(ctx, {
+    type: 'pie',
+    data: data,
+    options: options
+  });
+}
+
+function renderEmptyIndustryChart() {
+  renderIndustryChart(['No open positions'], [1]);
+}
+
+async function updateIndustryAllocationChart() {
+  if (!trades || trades.length === 0) {
+    renderEmptyIndustryChart();
+    return;
+  }
+
+  const industryTotals = {};
+  await Promise.all(trades.map(async (trade) => {
+    const industry = await fetchIndustry(trade.symbol);
+    const invested = trade.entry * trade.qty;
+    industryTotals[industry] = (industryTotals[industry] || 0) + invested;
+  }));
+
+  const labels = Object.keys(industryTotals);
+  const values = labels.map(label => industryTotals[label]);
+
+  if (labels.length === 0) {
+    renderEmptyIndustryChart();
+    return;
+  }
+
+  renderIndustryChart(labels, values);
 }
 
 function renderTrades() {
@@ -510,6 +658,8 @@ function renderTrades() {
     `₹${totalDeployed.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
   
   if (portfolioRiskPct > 5) notifyRisk();
+
+  updateIndustryAllocationChart();
 }
 
 function updateSL(tradeId, newSL) {
