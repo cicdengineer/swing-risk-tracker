@@ -145,11 +145,44 @@
     </table>
   </section>
 
-  <section id="industryAllocation">
-    <h2>🏭 Industry Allocation</h2>
-    <p class="chart-note">Based on deployed capital across open positions</p>
-    <canvas id="industryChart"></canvas>
-  </section>
+  <div class="widgets-container">
+    <section id="industryAllocation" class="widget-card">
+      <h2>🏭 Industry Allocation</h2>
+      <p class="chart-note">Based on deployed capital across open positions</p>
+      <canvas id="industryChart"></canvas>
+    </section>
+
+    <section id="marketMood" class="widget-card">
+      <h2>📊 Market Mood Index</h2>
+      <div id="marketMoodContent" class="mood-content">
+        <div class="mood-gauge">
+          <div id="moodNeedle" class="mood-needle"></div>
+          <div class="mood-label" id="moodLabel">Calculating...</div>
+        </div>
+        <div class="mood-indicators">
+          <div class="indicator" id="niftyIndicator">
+            <span class="indicator-label">Nifty 50</span>
+            <span class="indicator-value">-</span>
+          </div>
+          <div class="indicator" id="vixIndicator">
+            <span class="indicator-label">India VIX</span>
+            <span class="indicator-value">-</span>
+          </div>
+          <div class="indicator" id="advanceDeclineIndicator">
+            <span class="indicator-label">Advance/Decline</span>
+            <span class="indicator-value">-</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="stockNews" class="widget-card">
+      <h2>📰 Portfolio News</h2>
+      <div id="newsContent" class="news-scroll">
+        <div class="news-loading">Loading news...</div>
+      </div>
+    </section>
+  </div>
 
   <section id="closedPositions">
     <h2>Closed Positions</h2>

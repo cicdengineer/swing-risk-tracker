@@ -788,7 +788,7 @@ function getIndustryChartBorderColor() {
     : 'rgba(15, 23, 42, 0.9)';
 }
 
-function renderIndustryChart(labels, values) {
+function renderIndustryChart(labels, values, stocksByIndustry = []) {
   const canvas = document.getElementById('industryChart');
   if (!canvas) return;
 
@@ -826,7 +826,9 @@ function renderIndustryChart(labels, values) {
             const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
             const value = context.parsed;
             const percent = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
-            return `${context.label}: ₹${value.toLocaleString('en-IN', {maximumFractionDigits: 0})} (${percent}%)`;
+            const stocks = stocksByIndustry[context.dataIndex] || [];
+            const stocksText = stocks.length > 0 ? `\nStocks: ${stocks.join(', ')}` : '';
+            return `${context.label}: ₹${value.toLocaleString('en-IN', {maximumFractionDigits: 0})} (${percent}%)${stocksText}`;
           }
         }
       }
@@ -857,22 +859,28 @@ async function updateIndustryAllocationChart() {
     return;
   }
 
-  const industryTotals = {};
+  const industryData = {}; // Maps industry -> {total: amount, stocks: [symbols]}
   await Promise.all(trades.map(async (trade) => {
     const industry = await fetchIndustry(trade.symbol);
     const invested = trade.entry * trade.qty;
-    industryTotals[industry] = (industryTotals[industry] || 0) + invested;
+    
+    if (!industryData[industry]) {
+      industryData[industry] = { total: 0, stocks: [] };
+    }
+    industryData[industry].total += invested;
+    industryData[industry].stocks.push(trade.symbol);
   }));
 
-  const labels = Object.keys(industryTotals);
-  const values = labels.map(label => industryTotals[label]);
+  const labels = Object.keys(industryData);
+  const values = labels.map(label => industryData[label].total);
+  const stocksByIndustry = labels.map(label => industryData[label].stocks);
 
   if (labels.length === 0) {
     renderEmptyIndustryChart();
     return;
   }
 
-  renderIndustryChart(labels, values);
+  renderIndustryChart(labels, values, stocksByIndustry);
 }
 
 function renderTrades() {
@@ -955,6 +963,11 @@ function renderTrades() {
   if (portfolioRiskPct > 5) notifyRisk();
 
   updateIndustryAllocationChart();
+  
+  // Refresh portfolio news when positions change
+  if (typeof fetchPortfolioNews === 'function') {
+    fetchPortfolioNews();
+  }
 }
 
 function updateSL(tradeId, newSL) {
@@ -1509,16 +1522,7 @@ async function fetchNSEPrice(symbol) {
 }
 
 async function updateAllPrices() {
-  // Check if market is open
-  if (!isMarketOpen()) {
-    const statusEl = document.getElementById('priceUpdateStatus');
-    if (statusEl) {
-      statusEl.textContent = 'Market Closed';
-      statusEl.style.color = '#ef4444';
-    }
-    addDebugLog('⏸️ Market closed - skipping price update', 'info');
-    return;
-  }
+  const marketOpen = isMarketOpen();
   
   if (trades.length === 0) {
     addDebugLog('⚠️ No open positions to update', 'info');
@@ -1532,7 +1536,8 @@ async function updateAllPrices() {
     statusEl.style.color = '#f59e0b';
   }
   
-  addDebugLog(`🔄 Starting price update for ${trades.length} stock(s)`, 'info');
+  const priceType = marketOpen ? 'live prices' : 'previous close';
+  addDebugLog(`🔄 Fetching ${priceType} for ${trades.length} stock(s)`, 'info');
   
   let updatedCount = 0;
   let unchangedCount = 0;
@@ -1587,7 +1592,8 @@ async function updateAllPrices() {
   if (statusEl) {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-    statusEl.textContent = `Updated at ${timeStr}`;
+    const marketStatus = marketOpen ? 'LIVE' : 'CLOSED';
+    statusEl.textContent = `${marketStatus} • Updated at ${timeStr}`;
     statusEl.style.color = updatedCount > 0 ? '#22c55e' : '#94a3b8';
     
     // Revert to market status after 3 seconds
@@ -1659,6 +1665,310 @@ function manualRefreshPrices() {
   updateAllPrices();
 }
 
+// Market Mood Index
+async function fetchMarketMood() {
+  try {
+    // Fetch Nifty 50 data
+    const niftySymbol = '^NSEI';
+    const niftyUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${niftySymbol}?interval=1d&range=5d`;
+    const proxies = [
+      `https://corsproxy.io/?${encodeURIComponent(niftyUrl)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(niftyUrl)}`
+    ];
+
+    let niftyData = await fetchJsonFromProxies(niftyUrl, proxies);
+    
+    if (niftyData && niftyData.chart && niftyData.chart.result && niftyData.chart.result[0]) {
+      const result = niftyData.chart.result[0];
+      const meta = result.meta;
+      const currentPrice = meta.regularMarketPrice || meta.previousClose;
+      const previousClose = meta.chartPreviousClose || meta.previousClose;
+      const change = ((currentPrice - previousClose) / previousClose * 100).toFixed(2);
+      
+      document.getElementById('niftyIndicator').querySelector('.indicator-value').textContent = 
+        `${currentPrice.toFixed(2)} (${change > 0 ? '+' : ''}${change}%)`;
+      document.getElementById('niftyIndicator').querySelector('.indicator-value').style.color = 
+        change >= 0 ? '#22c55e' : '#ef4444';
+      
+      // Calculate mood based on Nifty change
+      let moodScore = 50; // Neutral
+      if (change > 0) {
+        moodScore = Math.min(50 + (change * 10), 100);
+      } else {
+        moodScore = Math.max(50 + (change * 10), 0);
+      }
+      
+      updateMoodGauge(moodScore);
+    }
+    
+    // Fetch India VIX
+    const vixSymbol = '^INDIAVIX';
+    const vixUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${vixSymbol}?interval=1d&range=1d`;
+    const vixProxies = [
+      `https://corsproxy.io/?${encodeURIComponent(vixUrl)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(vixUrl)}`
+    ];
+    
+    let vixData = await fetchJsonFromProxies(vixUrl, vixProxies);
+    
+    if (vixData && vixData.chart && vixData.chart.result && vixData.chart.result[0]) {
+      const vixResult = vixData.chart.result[0];
+      const vixMeta = vixResult.meta;
+      const vixPrice = vixMeta.regularMarketPrice || vixMeta.previousClose;
+      
+      document.getElementById('vixIndicator').querySelector('.indicator-value').textContent = 
+        vixPrice.toFixed(2);
+      document.getElementById('vixIndicator').querySelector('.indicator-value').style.color = 
+        vixPrice < 15 ? '#22c55e' : vixPrice < 20 ? '#f59e0b' : '#ef4444';
+    }
+    
+    // Fetch Advance/Decline data from NSE
+    await fetchAdvanceDeclineData();
+    
+  } catch (error) {
+    console.error('Error fetching market mood:', error);
+    addDebugLog('⚠️ Could not fetch market mood data', 'error');
+  }
+}
+
+async function fetchAdvanceDeclineData() {
+  try {
+    // Try to fetch NSE market breadth data
+    const nseAdvDecUrl = 'https://www.nseindia.com/api/market-data-pre-open?key=ALL';
+    const proxies = [
+      `https://corsproxy.io/?${encodeURIComponent(nseAdvDecUrl)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(nseAdvDecUrl)}`,
+      `https://r.jina.ai/http://${nseAdvDecUrl.replace(/^https?:\/\//, '')}`
+    ];
+
+    let data = await fetchJsonFromProxies(nseAdvDecUrl, proxies);
+    
+    if (data && data.data && Array.isArray(data.data)) {
+      const advances = data.data.filter(item => 
+        item.metadata && item.metadata.change && parseFloat(item.metadata.change) > 0
+      ).length;
+      const declines = data.data.filter(item => 
+        item.metadata && item.metadata.change && parseFloat(item.metadata.change) < 0
+      ).length;
+      
+      if (advances + declines > 0) {
+        const adRatio = (advances / (advances + declines) * 100).toFixed(1);
+        document.getElementById('advanceDeclineIndicator').querySelector('.indicator-value').textContent = 
+          `${advances}/${declines} (${adRatio}%)`;
+        document.getElementById('advanceDeclineIndicator').querySelector('.indicator-value').style.color = 
+          advances > declines ? '#22c55e' : '#ef4444';
+        return;
+      }
+    }
+    
+    // Fallback: Fetch Nifty 50 constituents advance/decline
+    const nifty50Url = 'https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%2050';
+    const nifty50Proxies = [
+      `https://corsproxy.io/?${encodeURIComponent(nifty50Url)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(nifty50Url)}`
+    ];
+    
+    let nifty50Data = await fetchJsonFromProxies(nifty50Url, nifty50Proxies);
+    
+    if (nifty50Data && nifty50Data.data && Array.isArray(nifty50Data.data)) {
+      const stocks = nifty50Data.data.filter(item => item.symbol !== 'NIFTY 50');
+      const advances = stocks.filter(item => item.pChange > 0).length;
+      const declines = stocks.filter(item => item.pChange < 0).length;
+      
+      if (advances + declines > 0) {
+        const adRatio = (advances / (advances + declines) * 100).toFixed(1);
+        document.getElementById('advanceDeclineIndicator').querySelector('.indicator-value').textContent = 
+          `${advances}/${declines} (${adRatio}%)`;
+        document.getElementById('advanceDeclineIndicator').querySelector('.indicator-value').style.color = 
+          advances > declines ? '#22c55e' : '#ef4444';
+        return;
+      }
+    }
+    
+    // Final fallback: Show "N/A" if no data available
+    document.getElementById('advanceDeclineIndicator').querySelector('.indicator-value').textContent = 'N/A';
+    document.getElementById('advanceDeclineIndicator').querySelector('.indicator-value').style.color = '#94a3b8';
+    
+  } catch (error) {
+    console.error('Error fetching advance/decline data:', error);
+    document.getElementById('advanceDeclineIndicator').querySelector('.indicator-value').textContent = 'N/A';
+    document.getElementById('advanceDeclineIndicator').querySelector('.indicator-value').style.color = '#94a3b8';
+  }
+}
+
+function updateMoodGauge(score) {
+  const needle = document.getElementById('moodNeedle');
+  const label = document.getElementById('moodLabel');
+  
+  // Rotate needle: -45deg (left/bearish) to +45deg (right/bullish)
+  const rotation = (score - 50) * 0.9; // Map 0-100 to -45 to +45
+  needle.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
+  
+  let moodText = 'Neutral';
+  if (score >= 75) moodText = 'Very Bullish 🚀';
+  else if (score >= 60) moodText = 'Bullish 📈';
+  else if (score >= 40) moodText = 'Neutral ⚖️';
+  else if (score >= 25) moodText = 'Bearish 📉';
+  else moodText = 'Very Bearish 🔻';
+  
+  label.textContent = moodText;
+}
+
+// Stock News Fetcher for NSE stocks
+async function fetchPortfolioNews() {
+  const newsContainer = document.getElementById('newsContent');
+  
+  if (!trades || trades.length === 0) {
+    newsContainer.innerHTML = '<div class="news-loading">Add positions to see related news</div>';
+    return;
+  }
+  
+  newsContainer.innerHTML = '<div class="news-loading">Fetching news...</div>';
+  
+  try {
+    const newsItems = [];
+    
+    // Fetch news for each stock (limit to first 5 to avoid too many requests)
+    const stocksToFetch = trades.slice(0, 5);
+    
+    await Promise.all(stocksToFetch.map(async (trade) => {
+      try {
+        // Method 1: Try Yahoo Finance with .NS suffix for NSE stocks
+        const yahooSymbol = `${trade.symbol}.NS`;
+        const newsUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(yahooSymbol)}&newsCount=5&quotesCount=0&enableNavLinks=false`;
+        const proxies = [
+          `https://corsproxy.io/?${encodeURIComponent(newsUrl)}`,
+          `https://api.allorigins.win/raw?url=${encodeURIComponent(newsUrl)}`
+        ];
+        
+        const data = await fetchJsonFromProxies(newsUrl, proxies);
+        
+        if (data && data.news && data.news.length > 0) {
+          // Filter for relevant news (must contain company name or symbol)
+          const relevantNews = data.news.filter(item => {
+            const title = (item.title || '').toLowerCase();
+            const summary = (item.summary || '').toLowerCase();
+            const symbolLower = trade.symbol.toLowerCase();
+            return title.includes(symbolLower) || summary.includes(symbolLower);
+          });
+          
+          relevantNews.slice(0, 2).forEach(item => {
+            newsItems.push({
+              symbol: trade.symbol,
+              title: item.title,
+              source: item.publisher || 'Financial News',
+              link: item.link,
+              time: new Date(item.providerPublishTime * 1000)
+            });
+          });
+        }
+        
+        // Method 2: If no news from Yahoo, try Google News RSS
+        if (newsItems.filter(n => n.symbol === trade.symbol).length === 0) {
+          const googleNewsUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(trade.symbol + ' NSE stock')}`;
+          const googleProxies = [
+            `https://api.allorigins.win/get?url=${encodeURIComponent(googleNewsUrl)}`,
+            `https://corsproxy.io/?${encodeURIComponent(googleNewsUrl)}`
+          ];
+          
+          for (const proxyUrl of googleProxies) {
+            try {
+              const response = await fetch(proxyUrl);
+              if (!response.ok) continue;
+              
+              const text = await response.text();
+              let rssContent = text;
+              
+              // If using allorigins, extract the contents
+              if (proxyUrl.includes('allorigins')) {
+                try {
+                  const json = JSON.parse(text);
+                  rssContent = json.contents;
+                } catch (e) {
+                  continue;
+                }
+              }
+              
+              // Parse RSS XML
+              const parser = new DOMParser();
+              const xmlDoc = parser.parseFromString(rssContent, 'text/xml');
+              const items = xmlDoc.querySelectorAll('item');
+              
+              let count = 0;
+              items.forEach(item => {
+                if (count >= 2) return;
+                
+                const title = item.querySelector('title')?.textContent;
+                const link = item.querySelector('link')?.textContent;
+                const pubDate = item.querySelector('pubDate')?.textContent;
+                const source = item.querySelector('source')?.textContent || 'Google News';
+                
+                if (title && link) {
+                  newsItems.push({
+                    symbol: trade.symbol,
+                    title: title,
+                    source: source,
+                    link: link,
+                    time: pubDate ? new Date(pubDate) : new Date()
+                  });
+                  count++;
+                }
+              });
+              
+              if (count > 0) break; // Got news, stop trying proxies
+            } catch (error) {
+              console.error(`Google News fetch error for ${trade.symbol}:`, error);
+              continue;
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching news for ${trade.symbol}:`, error);
+      }
+    }));
+    
+    // Sort by time
+    newsItems.sort((a, b) => b.time - a.time);
+    
+    if (newsItems.length === 0) {
+      newsContainer.innerHTML = '<div class="news-loading">No recent news available</div>';
+      return;
+    }
+    
+    // Render news items
+    newsContainer.innerHTML = newsItems.map(item => {
+      const timeAgo = getTimeAgo(item.time);
+      return `
+        <div class="news-item" onclick="window.open('${item.link}', '_blank')">
+          <div class="news-item-header">
+            <span class="news-symbol">${item.symbol}</span>
+            <span class="news-time">${timeAgo}</span>
+          </div>
+          <div class="news-title">${item.title}</div>
+          <div class="news-source">${item.source}</div>
+        </div>
+      `;
+    }).join('');
+    
+  } catch (error) {
+    console.error('Error fetching portfolio news:', error);
+    newsContainer.innerHTML = '<div class="news-loading">Could not load news</div>';
+    addDebugLog('⚠️ Could not fetch portfolio news', 'error');
+  }
+}
+
+function getTimeAgo(date) {
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
+}
+
 // Initialize authentication and data
 initializeDefaultUser();
 initializeManualIndustryMappings();
@@ -1677,4 +1987,19 @@ loadClosedTrades();
 setTimeout(() => {
   startPriceUpdates();
 }, 2000); // Wait 2 seconds after page load to start updates
+
+// Initialize widgets
+setTimeout(() => {
+  fetchMarketMood();
+  fetchPortfolioNews();
+}, 3000);
+
+// Refresh widgets periodically
+setInterval(() => {
+  fetchMarketMood();
+}, 5 * 60 * 1000); // Refresh market mood every 5 minutes
+
+setInterval(() => {
+  fetchPortfolioNews();
+}, 15 * 60 * 1000); // Refresh news every 15 minutes
 
