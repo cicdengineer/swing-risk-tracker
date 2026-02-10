@@ -18,6 +18,7 @@ const TRADES_COLLECTION = "trades";
 const CLOSED_TRADES_COLLECTION = "closedTrades";
 const SETTINGS_DOC = "settings/userSettings";
 const USERS_COLLECTION = "users";
+const INDUSTRY_MAPPINGS_COLLECTION = "industryMappings";
 
 // Authentication state
 let currentUser = null;
@@ -432,20 +433,66 @@ const INDUSTRY_LIST_CACHE_KEY = 'industryListCache';
 const INDUSTRY_LIST_TTL_MS = 24 * 60 * 60 * 1000;
 const industryLookupWarnings = new Set();
 
-// Manual industry mapping for stocks not in NSE list or hard to fetch
-// Add new mappings here when you discover missing industries
-const MANUAL_INDUSTRY_MAP = {
-  'ATHERENERG': 'Auto Components & Equipments',
-  'SIGNPOST': 'Advertising & Media',
-  'SFL': 'Consumer Durables',
-  'LICI': 'Insurance',
-  'JIOFINANCE': 'Finance',
-  'GODIGIT': 'Insurance',
-  'AWFIS': 'Real Estate',
-  'NETWEB': 'IT - Hardware',
-  'IDEAFORGE': 'Aerospace & Defence',
-  'TATATECH': 'IT Services & Consulting'
-};
+// In-memory cache for manual industry mappings from Firebase
+let manualIndustryMap = {};
+let manualIndustryMapLoaded = false;
+
+// Initialize manual industry mappings in Firebase (one-time setup)
+async function initializeManualIndustryMappings() {
+  const initialMappings = {
+    'ATHERENERG': 'Auto Components & Equipments',
+    'SIGNPOST': 'Advertising & Media',
+    'SFL': 'Consumer Durables',
+    'LICI': 'Insurance',
+    'JIOFINANCE': 'Finance',
+    'GODIGIT': 'Insurance',
+    'AWFIS': 'Real Estate',
+    'NETWEB': 'IT - Hardware',
+    'IDEAFORGE': 'Aerospace & Defence',
+    'TATATECH': 'IT Services & Consulting'
+  };
+
+  try {
+    // Check if collection is empty
+    const snapshot = await db.collection(INDUSTRY_MAPPINGS_COLLECTION).limit(1).get();
+    
+    if (snapshot.empty) {
+      // Initialize with default mappings
+      const batch = db.batch();
+      for (const [symbol, industry] of Object.entries(initialMappings)) {
+        const docRef = db.collection(INDUSTRY_MAPPINGS_COLLECTION).doc(symbol);
+        batch.set(docRef, { industry, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      }
+      await batch.commit();
+      addDebugLog('✅ Industry mappings collection initialized', 'success');
+    }
+  } catch (error) {
+    console.error('Error initializing industry mappings:', error);
+    addDebugLog('⚠️ Could not initialize industry mappings: ' + error.message, 'error');
+  }
+}
+
+// Load manual industry mappings from Firebase into memory
+async function loadManualIndustryMappings() {
+  if (manualIndustryMapLoaded) {
+    return manualIndustryMap;
+  }
+
+  try {
+    const snapshot = await db.collection(INDUSTRY_MAPPINGS_COLLECTION).get();
+    manualIndustryMap = {};
+    snapshot.forEach(doc => {
+      manualIndustryMap[doc.id] = doc.data().industry;
+    });
+    manualIndustryMapLoaded = true;
+    addDebugLog(`✅ Loaded ${Object.keys(manualIndustryMap).length} manual industry mappings`, 'info');
+    return manualIndustryMap;
+  } catch (error) {
+    console.error('Error loading manual industry mappings:', error);
+    addDebugLog('⚠️ Could not load manual industry mappings: ' + error.message, 'error');
+    return {};
+  }
+}
 
 function openTradingViewChart(symbol) {
   const nseSymbol = `NSE:${symbol}`;
@@ -677,9 +724,14 @@ async function fetchIndustry(symbol) {
     return cache[cacheKey];
   }
 
+  // Load manual mappings from Firebase if not loaded yet
+  if (!manualIndustryMapLoaded) {
+    await loadManualIndustryMappings();
+  }
+
   // Check manual mapping first (most reliable)
-  if (MANUAL_INDUSTRY_MAP[cacheKey]) {
-    const industry = MANUAL_INDUSTRY_MAP[cacheKey];
+  if (manualIndustryMap[cacheKey]) {
+    const industry = manualIndustryMap[cacheKey];
     cache[cacheKey] = industry;
     saveIndustryCache(cache);
     return industry;
@@ -1607,8 +1659,10 @@ function manualRefreshPrices() {
   updateAllPrices();
 }
 
-// Initialize authentication
+// Initialize authentication and data
 initializeDefaultUser();
+initializeManualIndustryMappings();
+loadManualIndustryMappings();
 checkSession();
 
 
