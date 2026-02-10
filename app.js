@@ -432,6 +432,21 @@ const INDUSTRY_LIST_CACHE_KEY = 'industryListCache';
 const INDUSTRY_LIST_TTL_MS = 24 * 60 * 60 * 1000;
 const industryLookupWarnings = new Set();
 
+// Manual industry mapping for stocks not in NSE list or hard to fetch
+// Add new mappings here when you discover missing industries
+const MANUAL_INDUSTRY_MAP = {
+  'ATHERENERG': 'Auto Components & Equipments',
+  'SIGNPOST': 'Advertising & Media',
+  'SFL': 'Consumer Durables',
+  'LICI': 'Insurance',
+  'JIOFINANCE': 'Finance',
+  'GODIGIT': 'Insurance',
+  'AWFIS': 'Real Estate',
+  'NETWEB': 'IT - Hardware',
+  'IDEAFORGE': 'Aerospace & Defence',
+  'TATATECH': 'IT Services & Consulting'
+};
+
 function openTradingViewChart(symbol) {
   const nseSymbol = `NSE:${symbol}`;
   const encodedSymbol = encodeURIComponent(nseSymbol);
@@ -660,6 +675,14 @@ async function fetchIndustry(symbol) {
   const cacheKey = normalizeSymbol(symbol);
   if (cache[cacheKey] && cache[cacheKey] !== 'Unknown') {
     return cache[cacheKey];
+  }
+
+  // Check manual mapping first (most reliable)
+  if (MANUAL_INDUSTRY_MAP[cacheKey]) {
+    const industry = MANUAL_INDUSTRY_MAP[cacheKey];
+    cache[cacheKey] = industry;
+    saveIndustryCache(cache);
+    return industry;
   }
 
   const nseIndustry = await fetchIndustryFromNseList(cacheKey);
