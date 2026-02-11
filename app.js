@@ -960,7 +960,7 @@ function renderTrades() {
   document.getElementById("deployedCapital").innerText =
     `₹${totalDeployed.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
   
-  if (portfolioRiskPct > 5) notifyRisk();
+  if (portfolioRiskPct > 2) notifyRisk();
 
   updateIndustryAllocationChart();
   
@@ -1393,7 +1393,7 @@ function loadClosedTrades() {
 }
 
 function notifyRisk() {
-  alert("⚠️ Portfolio risk exceeds 5%!");
+  alert("⚠️ Portfolio risk exceeds 2%!");
 }
 
 // Live Price Fetching for NSE Stocks
